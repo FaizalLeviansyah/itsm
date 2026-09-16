@@ -1,0 +1,15 @@
+[90m= [39m[34;4mApp\Models\Company[39;24m {#8727
+    [34mid[39m: [35m1[39m,
+    [34mname[39m: [32m"[39m[32mPT ASM[39m[32m"[39m,
+    [34mcode[39m: [32m"[39m[32mASM[39m[32m"[39m,
+    [34mfull_name[39m: [32m"[39m[32mPT Amarin Ship management[39m[32m"[39m,
+    [34mlogo[39m: [32m"[39m[32mcompanies/VkoxMsVbf13bd0qNbP0oTEnsjWUGugn1tR9JUdoy.jpg[39m[32m"[39m,
+    [34maddress[39m: [32m"[39m[32mCitra Tower jl Benyamin Sueb kav 6a, lt 08 Unit K-L, RT.13/RW.6, Kb. Kosong, Kec. Kemayoran, Kota Jakarta Pusat, Daerah Khusus Ibukota Jakarta 10630[39m[32m"[39m,
+    [34mphone[39m: [36mnull[39m,
+    [34memail[39m: [36mnull[39m,
+    [34mwebsite[39m: [36mnull[39m,
+    [34masset_prefix[39m: [32m"[39m[32mASM[39m[32m"[39m,
+    [34mis_active[39m: [35m1[39m,
+    [34mcreated_at[39m: [32m"[39m[32m2026-09-07 04:11:39[39m[32m"[39m,
+    [34mupdated_at[39m: [32m"[39m[32m2026-09-07 04:44:23[39m[32m"[39m,
+  }

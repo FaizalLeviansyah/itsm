@@ -17,6 +17,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 class SettingsController extends Controller
@@ -29,10 +30,27 @@ class SettingsController extends Controller
     // User Management
     public function users(Request $request)
     {
-        $users = User::when($request->search, function ($q) use ($request) {
-            $q->where('name', 'like', "%{$request->search}%")
-              ->orWhere('email', 'like', "%{$request->search}%");
-        })->orderBy('name')->paginate(20);
+        $query = User::query();
+
+        // Implementasi logika filter dropdown Office/Vessel
+        if ($request->has('user_type') && $request->user_type != '') {
+            if ($request->user_type == 'vessel') {
+                $query->where('department', 'Vessel');
+            } elseif ($request->user_type == 'office') {
+                $query->where(function($q) {
+                    $q->where('department', '!=', 'Vessel')->orWhereNull('department');
+                });
+            }
+        }
+
+        if ($request->has('search') && $request->search != '') {
+            $query->where(function ($q) use ($request) {
+                $q->where('name', 'like', "%{$request->search}%")
+                  ->orWhere('email', 'like', "%{$request->search}%");
+            });
+        }
+
+        $users = $query->orderBy('name')->paginate(20);
 
         // Count external users not yet synced
         $unsyncedCount = 0;
@@ -52,9 +70,57 @@ class SettingsController extends Controller
     {
         try {
             Artisan::call('sync:employees');
-            return redirect()->back()->with('success', 'Employees synchronized successfully.');
+            return redirect()->back()->with('success', 'Employees (Office) synchronized successfully.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Failed to sync employees: ' . $e->getMessage());
+        }
+    }
+
+    public function syncVessels()
+    {
+        try {
+            // Gunakan API Key khusus vessel yang diberikan di instruksi
+            $apiKey = env('MASTER_VESSEL_API_KEY', 'vUCwahxySBIyglyN1LZ3p6SRh0xcK8Vk');
+            $vesselApiUrl = env('MASTER_VESSEL_API_URL', 'http://api.amarin.biz.id/api/v1/data/db_master_ship/vessel');
+            
+            $response = Http::withHeaders([
+                'X-API-Key' => $apiKey,
+                'Accept' => 'application/json',
+            ])->get($vesselApiUrl, [
+                'page' => 1,
+                'per_page' => 500,
+                'sort' => '-id',
+            ]);
+
+            if ($response->successful()) {
+                $vessels = $response->json()['data'] ?? [];
+                foreach ($vessels as $vessel) {
+                    $vesselName = $vessel['vessel_name'] ?? $vessel['name'] ?? null;
+                    if (!$vesselName) continue;
+
+                    $email = $vessel['login_email'] ?? strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $vesselName)) . '@vessel.amarin.biz.id';
+
+                    User::updateOrCreate(
+                        ['email' => $email],
+                        [
+                            'name' => $vesselName,
+                            'password' => $vessel['login_password'] ?? $vessel['password'] ?? bcrypt('vesselpassword'),
+                            'role' => 'user',
+                            'department' => 'Vessel',
+                            'job_title' => 'Vessel',
+                            'position' => 'Vessel - ' . $vesselName,
+                            'source' => 'vessel_api',
+                            'source_id' => $vessel['id'] ?? null,
+                        ]
+                    );
+                }
+                return redirect()->back()->with('success', 'Vessels synchronized successfully.');
+            }
+
+            return redirect()->back()->with('error', 'Failed to fetch vessel data from API. Status: ' . $response->status());
+
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Failed to sync vessels: ' . $e->getMessage());
         }
     }
 

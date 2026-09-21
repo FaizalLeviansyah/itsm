@@ -137,6 +137,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
         Route::get('/settings/users', [SettingsController::class, 'users'])->name('settings.users');
         Route::post('/settings/users/sync', [SettingsController::class, 'syncUsers'])->name('settings.users.sync');
+        Route::post('/settings/users/sync-vessels', [SettingsController::class, 'syncVessels'])->name('settings.users.sync-vessels'); // Rute khusus sinkronisasi kapal
         Route::put('/settings/users/{user}/role', [SettingsController::class, 'updateUserRole'])->name('settings.users.role');
         Route::put('/settings/users/{user}/toggle', [SettingsController::class, 'toggleUserStatus'])->name('settings.users.toggle');
         Route::get('/settings/categories', [SettingsController::class, 'categories'])->name('settings.categories');

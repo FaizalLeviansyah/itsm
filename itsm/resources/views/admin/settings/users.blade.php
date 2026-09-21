@@ -7,26 +7,43 @@
         <h1 class="text-2xl font-bold text-gray-900">User Management</h1>
         <p class="text-sm text-gray-500 mt-1">Kelola semua user yang terdaftar di ITSM Portal</p>
     </div>
-    @if($unsyncedCount > 0)
-    <form action="{{ route('admin.settings.users.sync') }}" method="POST">
-        @csrf
-        <button type="submit" class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-semibold transition">
-            <i class="fas fa-sync-alt"></i> Sync {{ $unsyncedCount }} Users
-        </button>
-    </form>
-    @else
-    <form action="{{ route('admin.settings.users.sync') }}" method="POST">
-        @csrf
-        <button type="submit" class="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition">
-            <i class="fas fa-sync-alt"></i> Sync All
-        </button>
-    </form>
-    @endif
+    
+    <div class="flex gap-2">
+        @if($unsyncedCount > 0)
+        <form action="{{ route('admin.settings.users.sync') }}" method="POST">
+            @csrf
+            <button type="submit" class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-semibold transition">
+                <i class="fas fa-sync-alt"></i> Sync {{ $unsyncedCount }} Office Users
+            </button>
+        </form>
+        @else
+        <form action="{{ route('admin.settings.users.sync') }}" method="POST">
+            @csrf
+            <button type="submit" class="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition">
+                <i class="fas fa-sync-alt"></i> Sync Office
+            </button>
+        </form>
+        @endif
+
+        <form action="{{ route('admin.settings.users.sync-vessels') }}" method="POST">
+            @csrf
+            <button type="submit" class="inline-flex items-center gap-2 px-4 py-2.5 border border-blue-200 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-50 transition">
+                <i class="fas fa-ship"></i> Sync Vessels
+            </button>
+        </form>
+    </div>
 </div>
 
-<!-- Search -->
+<!-- Search & Filter -->
 <div class="bg-white rounded-xl border border-gray-100 p-4 mb-6">
     <form method="GET" class="flex gap-3">
+        <div class="w-48">
+            <select name="user_type" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500" onchange="this.form.submit()">
+                <option value="">Semua User</option>
+                <option value="office" {{ request('user_type') == 'office' ? 'selected' : '' }}>Office</option>
+                <option value="vessel" {{ request('user_type') == 'vessel' ? 'selected' : '' }}>Vessel</option>
+            </select>
+        </div>
         <div class="relative flex-1">
             <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
             <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari user..." class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500">
@@ -65,7 +82,7 @@
                         </div>
                     </td>
                     <td class="px-6 py-4 text-sm text-gray-600">{{ $user->email }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600">{{ $user->department ?? '-' }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">{{ $user->department ?? $user->job_title ?? '-' }}</td>
                     <td class="px-6 py-4 text-center">
                         <form action="{{ route('admin.settings.users.role', $user) }}" method="POST" class="inline">
                             @csrf @method('PUT')

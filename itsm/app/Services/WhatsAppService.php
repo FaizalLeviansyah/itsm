@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Ticket;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -9,112 +10,105 @@ class WhatsAppService
 {
     protected string $apiUrl;
     protected string $session;
+    protected string $defaultTo;
 
     public function __construct()
     {
-        $this->apiUrl = config('services.whatsapp.api_url');
-        $this->session = config('services.whatsapp.session');
+        $this->apiUrl = env('WA_API_URL', 'https://wa.amarin.biz.id/message/send-text');
+        $this->session = env('WA_SESSION', 'notif');
+        $this->defaultTo = env('WA_DEFAULT_TO', '628563339320');
     }
 
-    public function sendMessage(string $to, string $message): bool
+    /**
+     * Method utama untuk mengirim pesan via WhatsApp API
+     */
+    public function sendMessage(?string $to, string $message)
     {
-        if (empty($this->apiUrl) || empty($to)) {
-            Log::warning('WhatsApp not configured or recipient empty', ['to' => $to]);
-            return false;
+        $targetNumber = $this->formatPhoneNumber($to);
+        
+        // Gunakan nomor default (fallback) jika nomor tujuan tidak ada atau kosong
+        if (!$targetNumber) {
+            $targetNumber = $this->defaultTo;
         }
 
         try {
-            $response = Http::timeout(10)->get($this->apiUrl, [
+            $response = Http::post($this->apiUrl, [
                 'session' => $this->session,
-                'to' => $to,
-                'text' => $message,
+                'to'      => (string) $targetNumber,
+                'text'    => $message,
             ]);
 
-            if ($response->successful()) {
-                Log::info('WhatsApp message sent', ['to' => $to]);
-                return true;
-            }
-
-            Log::error('WhatsApp message failed', ['to' => $to, 'response' => $response->body()]);
-            return false;
+            return $response->json();
         } catch (\Exception $e) {
-            Log::error('WhatsApp service error', ['error' => $e->getMessage()]);
+            Log::error('WhatsApp Notification Error: ' . $e->getMessage());
             return false;
         }
     }
 
-    public function notifyTicketCreated($ticket): void
+    /**
+     * Notifikasi saat tiket baru dibuat
+     */
+    public function notifyTicketCreated(Ticket $ticket)
     {
-        $message = "🎫 *New Ticket Created*\n\n";
-        $message .= "No: {$ticket->ticket_number}\n";
+        $to = $ticket->requester->phone ?? $this->defaultTo;
+        
+        $message  = "*[TICKET CREATED]*\n\n";
+        $message .= "Ticket Number: *{$ticket->ticket_number}*\n";
         $message .= "Title: {$ticket->title}\n";
         $message .= "Priority: {$ticket->priority->name}\n";
-        $message .= "From: {$ticket->requester->name}\n";
-        $message .= "Category: {$ticket->category->name}\n\n";
-        $message .= "Please check ITSM Dashboard for details.";
+        $message .= "Status: Open\n\n";
+        $message .= "Tiket Anda berhasil dibuat dan sedang menunggu penugasan tim IT.";
 
-        $this->sendMessage(config('services.whatsapp.default_to'), $message);
+        return $this->sendMessage($to, $message);
     }
 
-    public function notifyTicketAssigned($ticket): void
+    /**
+     * Notifikasi saat tiket di-assign ke teknisi
+     */
+    public function notifyTicketAssigned(Ticket $ticket)
     {
-        $assignee = $ticket->assignee;
-        $phone = $assignee->phone ?? config('services.whatsapp.default_to');
-
-        $message = "🔧 *Ticket Assigned to You*\n\n";
-        $message .= "No: {$ticket->ticket_number}\n";
+        $to = $ticket->assignee->phone ?? $this->defaultTo;
+        
+        $message  = "*[TICKET ASSIGNED]*\n\n";
+        $message .= "Ticket Number: *{$ticket->ticket_number}*\n";
         $message .= "Title: {$ticket->title}\n";
-        $message .= "Priority: {$ticket->priority->name}\n";
-        $message .= "From: {$ticket->requester->name}\n\n";
-        $message .= "You are assigned to handle this ticket.\n";
-        $message .= "Deadline: " . ($ticket->due_date ? $ticket->due_date->format('d M Y H:i') : 'Not set');
+        $message .= "Assigned To: {$ticket->assignee->name}\n\n";
+        $message .= "Tiket telah ditugaskan. Silakan cek sistem untuk detail pekerjaan.";
 
-        $this->sendMessage($phone, $message);
+        return $this->sendMessage($to, $message);
     }
 
-    public function notifyTicketResolved($ticket): void
+    /**
+     * Notifikasi saat tiket sudah berstatus Resolved
+     */
+    public function notifyTicketResolved(Ticket $ticket)
     {
-        $requester = $ticket->requester;
-        $phone = $requester->phone ?? config('services.whatsapp.default_to');
-        $ratingUrl = url("/tickets/{$ticket->id}");
-
-        $message = "✅ *Ticket Resolved*\n\n";
-        $message .= "No: {$ticket->ticket_number}\n";
+        $to = $ticket->requester->phone ?? $this->defaultTo;
+        
+        $message  = "*[TICKET RESOLVED]*\n\n";
+        $message .= "Ticket Number: *{$ticket->ticket_number}*\n";
         $message .= "Title: {$ticket->title}\n";
-        $message .= "Handled by: {$ticket->assignee->name}\n\n";
-        $message .= "Your ticket has been resolved.\n\n";
-        $message .= "⭐ *Rating is REQUIRED* to close this ticket.\n";
-        $message .= "Click to rate:\n";
-        $message .= $ratingUrl;
+        $message .= "Resolution Notes:\n{$ticket->resolution_notes}\n\n";
+        $message .= "Tiket Anda telah diselesaikan oleh tim IT. Silakan login ke sistem untuk memberikan rating dan menutup tiket Anda.";
 
-        $this->sendMessage($phone, $message);
+        return $this->sendMessage($to, $message);
     }
 
-    public function notifySlaBreach($ticket): void
+    /**
+     * Helper untuk memformat nomor HP (mengubah Awalan 0 menjadi 62)
+     */
+    private function formatPhoneNumber(?string $phone): ?string
     {
-        $message = "⚠️ *SLA Breach Alert*\n\n";
-        $message .= "No: {$ticket->ticket_number}\n";
-        $message .= "Title: {$ticket->title}\n";
-        $message .= "Status: {$ticket->status}\n";
-        $message .= "Priority: {$ticket->priority->name}\n\n";
-        $message .= "This ticket has exceeded its SLA target!";
+        if (empty($phone)) return null;
 
-        $this->sendMessage(config('services.whatsapp.default_to'), $message);
-    }
+        // Hilangkan karakter selain angka
+        $phone = preg_replace('/[^0-9]/', '', $phone);
 
-    public function notifyRatingReminder($ticket): void
-    {
-        $requester = $ticket->requester;
-        $phone = $requester->phone ?? config('services.whatsapp.default_to');
-        $ratingUrl = url("/tickets/{$ticket->id}");
+        // Ganti 0 di awal menjadi 62
+        if (str_starts_with($phone, '0')) {
+            $phone = '62' . substr($phone, 1);
+        }
 
-        $message = "🔔 *Reminder: Please Rate*\n\n";
-        $message .= "No: {$ticket->ticket_number}\n";
-        $message .= "Title: {$ticket->title}\n\n";
-        $message .= "Your ticket has been resolved.\n";
-        $message .= "⭐ Please rate the service to close the ticket.\n\n";
-        $message .= "Click: {$ratingUrl}";
-
-        $this->sendMessage($phone, $message);
+        return $phone;
     }
 }

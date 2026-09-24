@@ -23,12 +23,20 @@
         </a>
         @endif
         @can('manageTickets')
-        <button onclick="document.getElementById('assign-modal').classList.toggle('hidden')" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
-            <i class="fas fa-user-plus text-xs text-gray-400"></i> Assign
-        </button>
-        <button onclick="document.getElementById('status-modal').classList.toggle('hidden')" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
-            <i class="fas fa-exchange-alt text-xs text-gray-400"></i> Change Status
-        </button>
+            @if(Auth::user()->role === 'admin')
+            <button onclick="document.getElementById('assign-modal').classList.toggle('hidden')" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                <i class="fas fa-{{ $ticket->assigned_to ? 'exchange-alt' : 'user-plus' }} text-xs text-gray-400"></i> 
+                {{ $ticket->assigned_to ? 'Reassign' : 'Assign' }}
+            </button>
+            @elseif(Auth::user()->role === 'technician')
+            <button onclick="document.getElementById('assign-modal').classList.toggle('hidden')" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                <i class="fas fa-share text-xs text-gray-400"></i> Reassign to Admin
+            </button>
+            @endif
+
+            <button onclick="document.getElementById('status-modal').classList.toggle('hidden')" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                <i class="fas fa-tasks text-xs text-gray-400"></i> Change Status
+            </button>
         @endcan
     </div>
 </div>
@@ -72,7 +80,7 @@
                     <p class="text-xs text-gray-500">The ticket will not close until you submit a rating.</p>
                 </div>
             </div>
-            <form action="{{ route('tickets.rate', $ticket) }}" method="POST" class="space-y-4 mt-4">
+            <form action="{{ route('tickets.rateAndClose', $ticket) }}" method="POST" class="space-y-4 mt-4">
                 @csrf
                 <div>
                     <label class="block text-xs font-semibold text-gray-500 uppercase mb-2">Overall Rating *</label>
@@ -83,29 +91,7 @@
                     </div>
                     <input type="hidden" name="rating" id="rating-value" required>
                 </div>
-                <div class="grid grid-cols-3 gap-3">
-                    <div>
-                        <label class="block text-xs text-gray-500 mb-1">Response Speed</label>
-                        <select name="response_rating" class="no-select2 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
-                            <option value="">-</option>
-                            @for($i=1;$i<=5;$i++)<option value="{{ $i }}">{{ $i }} ★</option>@endfor
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-gray-500 mb-1">Solution Quality</label>
-                        <select name="resolution_rating" class="no-select2 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
-                            <option value="">-</option>
-                            @for($i=1;$i<=5;$i++)<option value="{{ $i }}">{{ $i }} ★</option>@endfor
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-gray-500 mb-1">Professionalism</label>
-                        <select name="professionalism_rating" class="no-select2 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
-                            <option value="">-</option>
-                            @for($i=1;$i<=5;$i++)<option value="{{ $i }}">{{ $i }} ★</option>@endfor
-                        </select>
-                    </div>
-                </div>
+                
                 <div>
                     <label class="block text-xs text-gray-500 mb-1">Feedback (optional)</label>
                     <textarea name="feedback" rows="3" class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm" placeholder="Add additional comments..."></textarea>
@@ -337,18 +323,37 @@
 @can('manageTickets')
 <div id="assign-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/30" onclick="if(event.target===this)this.classList.add('hidden')">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Assign Ticket</h3>
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+            @if(Auth::user()->role === 'admin')
+                {{ $ticket->assigned_to ? 'Reassign Ticket' : 'Assign Ticket' }}
+            @else
+                Reassign to Admin
+            @endif
+        </h3>
         <form action="{{ route('tickets.assign', $ticket) }}" method="POST">
             @csrf
             <select name="assigned_to" required class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm mb-4">
-                <option value="">Select Technician</option>
-                @foreach($technicians as $tech)
-                <option value="{{ $tech->id }}" {{ $ticket->assigned_to == $tech->id ? 'selected' : '' }}>{{ $tech->name }} ({{ ucfirst($tech->role) }})</option>
-                @endforeach
+                @if(Auth::user()->role === 'admin')
+                    <option value="">Select Technician / Admin</option>
+                    @foreach($technicians as $tech)
+                    <option value="{{ $tech->id }}" {{ $ticket->assigned_to == $tech->id ? 'selected' : '' }}>{{ $tech->name }} ({{ ucfirst($tech->role) }})</option>
+                    @endforeach
+                @else
+                    <option value="">Pilih Admin untuk Reassign</option>
+                    @foreach(\App\Models\User::where('role', 'admin')->get() as $admin)
+                    <option value="{{ $admin->id }}">{{ $admin->name }} (Admin)</option>
+                    @endforeach
+                @endif
             </select>
             <div class="flex justify-end gap-2">
                 <button type="button" onclick="document.getElementById('assign-modal').classList.add('hidden')" class="px-4 py-2 border border-gray-200 rounded-lg text-sm">Cancel</button>
-                <button type="submit" class="px-4 py-2 bg-brand-500 text-white rounded-lg text-sm font-semibold">Assign</button>
+                <button type="submit" class="px-4 py-2 bg-brand-500 text-white rounded-lg text-sm font-semibold">
+                    @if(Auth::user()->role === 'admin')
+                        {{ $ticket->assigned_to ? 'Reassign' : 'Assign' }}
+                    @else
+                        Reassign
+                    @endif
+                </button>
             </div>
         </form>
     </div>
@@ -361,7 +366,21 @@
         <form action="{{ route('tickets.status', $ticket) }}" method="POST">
             @csrf
             <select name="status" required class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm mb-3">
-                @foreach(['open','assigned','in_progress','pending','resolved','closed','cancelled'] as $s)
+                @php
+                    // Daftar status default (tanpa closed)
+                    $statuses = ['open','assigned','in_progress','pending','resolved','cancelled'];
+                    
+                    // Tambahkan opsi 'closed' hanya jika user yang login adalah admin
+                    if(Auth::user()->role === 'admin') {
+                        $statuses[] = 'closed';
+                    }
+                    
+                    // Pastikan status saat ini tetap ada di dropdown (untuk mencegah blank option jika tiket sudah closed)
+                    if(!in_array($ticket->status, $statuses)) {
+                        $statuses[] = $ticket->status;
+                    }
+                @endphp
+                @foreach($statuses as $s)
                 <option value="{{ $s }}" {{ $ticket->status == $s ? 'selected' : '' }}>{{ ucfirst(str_replace('_',' ',$s)) }}</option>
                 @endforeach
             </select>

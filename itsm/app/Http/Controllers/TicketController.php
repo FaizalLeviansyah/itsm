@@ -216,6 +216,15 @@ class TicketController extends Controller
             'assigned_to' => 'required|exists:users,id',
         ]);
 
+        // --- PROTEKSI BACKEND (LOGIC HOLE FIX) ---
+        $targetUser = User::find($request->assigned_to);
+        
+        // Jika yang login Technician, pastikan dia HANYA bisa melempar ke Admin
+        if (Auth::user()->role === 'technician' && $targetUser->role !== 'admin') {
+            return back()->with('error', 'Akses ditolak: Technician hanya dapat melakukan Reassign ke Admin.');
+        }
+        // -----------------------------------------
+
         $oldAssignee = $ticket->assigned_to;
         $ticket->update([
             'assigned_to' => $request->assigned_to,
@@ -229,8 +238,8 @@ class TicketController extends Controller
             'user_id' => Auth::id(),
             'field' => 'assigned_to',
             'old_value' => $oldAssignee ? User::find($oldAssignee)->name : null,
-            'new_value' => User::find($request->assigned_to)->name,
-            'note' => 'Ticket assigned to technician',
+            'new_value' => $targetUser->name,
+            'note' => Auth::user()->role === 'technician' ? 'Ticket reassigned to Admin' : 'Ticket assigned to technician',
         ]);
 
         $ticket->load(['assignee', 'requester', 'priority']);
@@ -247,9 +256,20 @@ class TicketController extends Controller
             'status' => 'required|in:open,assigned,in_progress,pending,resolved,closed,cancelled',
         ]);
 
-        if ($request->status === 'closed' && $ticket->status === 'resolved' && !$ticket->rating) {
-            return back()->with('error', 'Ticket cannot be closed until the requester provides a rating.');
+        // --- PROTEKSI BACKEND (LOGIC HOLE FIX) ---
+        // 1. Technician dilarang keras men-set status ke 'closed'
+        if (Auth::user()->role === 'technician' && $request->status === 'closed') {
+            return back()->with('error', 'Akses ditolak: Technician tidak diizinkan menutup (Close) tiket.');
         }
+
+        // 2. Jika Admin ingin force close tiket yang resolved tapi belum dirating, kita izinkan.
+        // Jika selain Admin (misal dari sistem lain), tetap kita blokir.
+        if ($request->status === 'closed' && $ticket->status === 'resolved' && !$ticket->rating) {
+            if (Auth::user()->role !== 'admin') {
+                return back()->with('error', 'Ticket cannot be closed until the requester provides a rating.');
+            }
+        }
+        // -----------------------------------------
 
         $oldStatus = $ticket->status;
         $data = ['status' => $request->status];
@@ -271,7 +291,7 @@ class TicketController extends Controller
             'field' => 'status',
             'old_value' => $oldStatus,
             'new_value' => $request->status,
-            'note' => $request->notes ?? null,
+            'note' => $request->resolution_notes ?? null, // Diperbaiki dari $request->notes agar log deskripsi masuk
         ]);
 
         if ($request->status === 'resolved') {

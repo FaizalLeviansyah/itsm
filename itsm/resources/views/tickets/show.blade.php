@@ -245,6 +245,12 @@
                 </div>
             </div>
             <div class="space-y-2 text-sm">
+                @if($ticket->company)
+                <div class="flex justify-between">
+                    <span class="text-gray-500">Company</span>
+                    <span class="text-gray-800 font-medium">{{ $ticket->company->name }}</span>
+                </div>
+                @endif
                 @if($ticket->requester->department)<div class="flex justify-between"><span class="text-gray-500">Department</span><span class="text-gray-800 font-medium">{{ $ticket->requester->department }}</span></div>@endif
                 @if($ticket->location)<div class="flex justify-between"><span class="text-gray-500">Location</span><span class="text-gray-800 font-medium">{{ $ticket->location }}</span></div>@endif
                 @if($ticket->requester->phone)<div class="flex justify-between"><span class="text-gray-500">Contact</span><span class="text-brand-600 font-medium">{{ $ticket->requester->phone }}</span></div>@endif

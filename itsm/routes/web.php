@@ -53,6 +53,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/tickets/{ticket}/status', [TicketController::class, 'updateStatus'])->name('tickets.status');
     Route::post('/tickets/{ticket}/comment', [TicketController::class, 'addComment'])->name('tickets.comment');
     Route::post('/tickets/{ticket}/reopen', [TicketController::class, 'reopen'])->name('tickets.reopen');
+    
+    // ---> TAMBAHKAN BARIS INI DI SINI <---
+    Route::post('/tickets/{ticket}/rate-and-close', [TicketController::class, 'rateAndClose'])->name('tickets.rateAndClose');
     Route::get('/api/subcategories/{categoryId}', [TicketController::class, 'getSubCategories'])->name('api.subcategories');
 
     // Ratings

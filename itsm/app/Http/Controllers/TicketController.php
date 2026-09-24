@@ -418,6 +418,53 @@ class TicketController extends Controller
 
         return back()->with('success', "{$count} tickets updated successfully.");
     }
-
     
+    // ==========================================
+    // TAMBAHAN BARU: OPSI 1 (Selesai & Rating)
+    // ==========================================
+    public function rateAndClose(Request $request, Ticket $ticket)
+    {
+        // 1. Validasi hanya requester yang bisa melakukan ini
+        if ($ticket->requester_id !== Auth::id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        // 2. Pastikan status tiket sudah 'resolved' oleh teknisi
+        if ($ticket->status !== 'resolved') {
+            return back()->with('error', 'Hanya tiket dengan status Resolved yang dapat diulas dan ditutup.');
+        }
+
+        // 3. Validasi input rating 1-5 dan komentar
+        $request->validate([
+            'rating' => 'required|integer|min:1|max:5',
+            'feedback' => 'nullable|string|max:1000'
+        ]);
+
+        // 4. Simpan data rating ke tabel ticket_ratings
+        $ticket->rating()->create([
+            'user_id' => Auth::id(),
+            'technician_id' => $ticket->assigned_to,
+            'rating' => $request->rating,
+            'feedback' => $request->feedback,
+            'resolution_time_minutes' => $ticket->resolution_time,
+        ]);
+
+        // 5. Ubah status tiket menjadi Closed
+        $ticket->update([
+            'status' => 'closed',
+            'closed_at' => now(),
+        ]);
+
+        // 6. Catat log history bahwa tiket ditutup oleh requester beserta ratingnya
+        TicketHistory::create([
+            'ticket_id' => $ticket->id,
+            'user_id' => Auth::id(),
+            'field' => 'status',
+            'old_value' => 'resolved',
+            'new_value' => 'closed',
+            'note' => 'Tiket diselesaikan oleh requester dengan rating: ' . $request->rating . ' Bintang',
+        ]);
+
+        return back()->with('success', 'Terima kasih! Tiket telah berhasil ditutup dan ulasan Anda telah disimpan.');
+    }
 }

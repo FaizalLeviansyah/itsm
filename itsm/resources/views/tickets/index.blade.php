@@ -94,6 +94,7 @@
     <div class="overflow-x-auto">
         <table class="w-full">
             <thead>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
                 <tr class="border-b border-gray-100 bg-gray-50/50">
                     @can('manageTickets')
                     <th class="px-3 py-3 w-10">
@@ -147,6 +148,18 @@
                                 <span class="text-[9px] font-bold text-gray-600">{{ strtoupper(substr($ticket->requester->name, 0, 2)) }}</span>
                             </div>
                             <span class="text-sm text-gray-700">{{ Str::limit($ticket->requester->name, 15) }}</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-2">
+                            <div class="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center">
+                                <span class="text-[9px] font-bold text-gray-600">
+                                    {{ $ticket->company ? strtoupper(substr($ticket->company->name, 0, 2)) : '-' }}
+                                </span>
+                            </div>
+                            <span class="text-sm text-gray-700">
+                                {{ $ticket->company ? Str::limit($ticket->company->name, 15) : '-' }}
+                            </span>
                         </div>
                     </td>
                     <td class="px-6 py-4">

@@ -103,7 +103,7 @@
                     <i class="fas fa-bug w-5 text-center"></i><span>Problems</span>
                 </a>
                 <a href="{{ route('vessels.index') }}" class="sidebar-link {{ request()->routeIs('vessels.*') ? 'active' : '' }}">
-                    <i class="fas fa-ship w-5 text-center"></i><span>Vessels</span>
+                    <i class="fas fa-ship w-5 text-center"></i><span>Location Overview</span>
                 </a>
                 @endcan
                 @can('manageSettings')
@@ -128,7 +128,7 @@
             <span>Log Out</span>
         </button>
     </form>
-</div>c
+</div>
 
             <div class="p-4 border-t border-gray-100">
                 <a href="{{ route('tickets.create') }}" class="btn-wave flex items-center justify-center gap-2 w-full bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold py-3 rounded-lg transition-all hover:shadow-lg hover:shadow-brand-500/25">

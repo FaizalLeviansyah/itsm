@@ -21,7 +21,6 @@ class VesselDashboardController extends Controller
         }
 
         // Get vessel stats from local tickets and assets
-        $vesselStats = [];
         $vesselNames = Asset::whereNotNull('vessel_name')
             ->select('vessel_name')
             ->distinct()
@@ -33,28 +32,71 @@ class VesselDashboardController extends Controller
             ->distinct()
             ->pluck('vessel_name');
 
-        $allVesselNames = $vesselNames->merge($ticketVessels)->unique();
+        $allLocationNames = $vesselNames->merge($ticketVessels)->unique();
 
-        foreach ($allVesselNames as $vesselName) {
-            $vesselStats[] = [
-                'name' => $vesselName,
-                'total_assets' => Asset::where('vessel_name', $vesselName)->count(),
-                'assets_in_use' => Asset::where('vessel_name', $vesselName)->where('status', 'in_use')->count(),
-                'assets_maintenance' => Asset::where('vessel_name', $vesselName)->where('status', 'maintenance')->count(),
-                'open_tickets' => Ticket::where('vessel_name', $vesselName)->whereNotIn('status', ['resolved', 'closed'])->count(),
-                'total_tickets' => Ticket::where('vessel_name', $vesselName)->count(),
+        $vesselStats = [];
+        $officeStats = [];
+        
+        $vesselTotals = ['locations' => 0, 'assets' => 0, 'open_tickets' => 0, 'maintenance' => 0];
+        $officeTotals = ['locations' => 0, 'assets' => 0, 'open_tickets' => 0, 'maintenance' => 0];
+
+        // Keyword untuk mendeteksi mana yang masuk tab Office
+        $officeKeywords = ['pt ', 'shore', 'office', 'cadet', 'new'];
+
+        foreach ($allLocationNames as $locationName) {
+            $isOffice = false;
+            foreach ($officeKeywords as $keyword) {
+                if (stripos($locationName, $keyword) !== false) {
+                    $isOffice = true;
+                    break;
+                }
+            }
+
+            $totalAssets = Asset::where('vessel_name', $locationName)->count();
+            $assetsInUse = Asset::where('vessel_name', $locationName)->where('status', 'in_use')->count();
+            $assetsMaintenance = Asset::where('vessel_name', $locationName)->where('status', 'maintenance')->count();
+            $openTickets = Ticket::where('vessel_name', $locationName)->whereNotIn('status', ['resolved', 'closed'])->count();
+            $totalTickets = Ticket::where('vessel_name', $locationName)->count();
+
+            $statData = [
+                'name' => $locationName,
+                'type' => $isOffice ? 'office' : 'vessel', // Penanda untuk ikon dinamis
+                'total_assets' => $totalAssets,
+                'assets_in_use' => $assetsInUse,
+                'assets_maintenance' => $assetsMaintenance,
+                'open_tickets' => $openTickets,
+                'total_tickets' => $totalTickets,
             ];
+
+            if ($isOffice) {
+                $officeStats[] = $statData;
+                $officeTotals['locations']++;
+                $officeTotals['assets'] += $totalAssets;
+                $officeTotals['open_tickets'] += $openTickets;
+                $officeTotals['maintenance'] += $assetsMaintenance;
+            } else {
+                $vesselStats[] = $statData;
+                $vesselTotals['locations']++;
+                $vesselTotals['assets'] += $totalAssets;
+                $vesselTotals['open_tickets'] += $openTickets;
+                $vesselTotals['maintenance'] += $assetsMaintenance;
+            }
         }
 
-        // Overall stats
-        $stats = [
-            'total_vessels' => $allVesselNames->count(),
-            'total_vessel_assets' => Asset::whereNotNull('vessel_name')->count(),
-            'vessel_open_tickets' => Ticket::whereNotNull('vessel_name')->whereNotIn('status', ['resolved', 'closed'])->count(),
-            'vessel_maintenance_assets' => Asset::whereNotNull('vessel_name')->where('status', 'maintenance')->count(),
+        // Gabungkan seluruh data untuk tab 'All'
+        $allStats = array_merge($vesselStats, $officeStats);
+        $allTotals = [
+            'locations' => $vesselTotals['locations'] + $officeTotals['locations'],
+            'assets' => $vesselTotals['assets'] + $officeTotals['assets'],
+            'open_tickets' => $vesselTotals['open_tickets'] + $officeTotals['open_tickets'],
+            'maintenance' => $vesselTotals['maintenance'] + $officeTotals['maintenance'],
         ];
 
-        return view('vessels.index', compact('vesselStats', 'stats', 'vessels'));
+        return view('vessels.index', compact(
+            'allStats', 'vesselStats', 'officeStats', 
+            'allTotals', 'vesselTotals', 'officeTotals', 
+            'vessels'
+        ));
     }
 
     public function show(Request $request, string $vesselName)

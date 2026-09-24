@@ -416,6 +416,11 @@ class TicketController extends Controller
             'action' => 'required|in:assign,close,cancel',
         ]);
 
+        // PROTEKSI TAMBAHAN: Cegah Technician melakukan Bulk Close
+        if ($request->action === 'close' && Auth::user()->role === 'technician') {
+            return back()->with('error', 'Akses ditolak: Technician tidak diizinkan melakukan Close tiket massal.');
+        }
+
         $tickets = Ticket::whereIn('id', $request->ticket_ids)->get();
         $count = 0;
 
@@ -439,6 +444,9 @@ class TicketController extends Controller
         return back()->with('success', "{$count} tickets updated successfully.");
     }
     
+    // ==========================================
+    // TAMBAHAN BARU: OPSI 1 (Selesai & Rating)
+    // ==========================================
     // ==========================================
     // TAMBAHAN BARU: OPSI 1 (Selesai & Rating)
     // ==========================================
@@ -484,6 +492,20 @@ class TicketController extends Controller
             'new_value' => 'closed',
             'note' => 'Tiket diselesaikan oleh requester dengan rating: ' . $request->rating . ' Bintang',
         ]);
+
+        // 7. Trigger WhatsApp Service & Notifikasi
+        try {
+            // Load relasi agar data assignee (nomor HP) dan rating dapat ditarik oleh WA Service
+            $ticket->load(['assignee', 'rating']);
+            $this->waService->notifyTicketClosed($ticket);
+            
+            // Opsional: Jika Anda juga menggunakan in-app notification dari database Laravel
+            if ($ticket->assignee) {
+                $ticket->assignee->notify(new TicketNotification($ticket, 'closed'));
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Gagal mengirim WA Rate & Close: ' . $e->getMessage());
+        }
 
         return back()->with('success', 'Terima kasih! Tiket telah berhasil ditutup dan ulasan Anda telah disimpan.');
     }

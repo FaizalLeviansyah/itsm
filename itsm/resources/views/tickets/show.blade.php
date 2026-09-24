@@ -367,19 +367,20 @@
             @csrf
             <select name="status" required class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm mb-3">
                 @php
-                    // Daftar status default (tanpa closed)
+                    // 1. Daftar status default (tanpa opsi 'closed')
                     $statuses = ['open','assigned','in_progress','pending','resolved','cancelled'];
                     
-                    // Tambahkan opsi 'closed' hanya jika user yang login adalah admin
+                    // 2. Tambahkan opsi 'closed' HANYA jika yang login adalah admin
                     if(Auth::user()->role === 'admin') {
                         $statuses[] = 'closed';
                     }
                     
-                    // Pastikan status saat ini tetap ada di dropdown (untuk mencegah blank option jika tiket sudah closed)
+                    // 3. Pastikan status saat ini tetap ada di dropdown (mencegah error jika tiket terlanjur closed)
                     if(!in_array($ticket->status, $statuses)) {
                         $statuses[] = $ticket->status;
                     }
                 @endphp
+                
                 @foreach($statuses as $s)
                 <option value="{{ $s }}" {{ $ticket->status == $s ? 'selected' : '' }}>{{ ucfirst(str_replace('_',' ',$s)) }}</option>
                 @endforeach

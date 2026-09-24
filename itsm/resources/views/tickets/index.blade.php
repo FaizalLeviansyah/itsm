@@ -75,7 +75,12 @@
         <div id="bulk-ids"></div>
         <select name="action" required class="border border-brand-200 rounded-lg px-3 py-1.5 text-sm bg-white">
             <option value="assign">Assign To...</option>
-            <option value="close">Close All</option>
+            
+            <!-- Tampilkan opsi Close All hanya untuk Admin -->
+            @if(Auth::user()->role === 'admin')
+                <option value="close">Close All</option>
+            @endif
+            
             <option value="cancel">Cancel All</option>
         </select>
         <select name="assign_to" class="border border-brand-200 rounded-lg px-3 py-1.5 text-sm bg-white">

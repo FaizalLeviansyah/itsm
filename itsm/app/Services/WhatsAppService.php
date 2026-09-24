@@ -94,6 +94,26 @@ class WhatsAppService
         return $this->sendMessage($to, $message);
     }
 
+    public function notifyTicketClosed(Ticket $ticket)
+    {
+        // Kirim notifikasi ke teknisi yang mengerjakan tiket ini
+        $to = $ticket->assignee->phone ?? $this->defaultTo;
+        
+        // Ambil data rating (asumsikan relasi rating di Model Ticket menggunakan hasOne)
+        $ratingData = $ticket->rating;
+        $ratingValue = $ratingData ? $ratingData->rating : '-';
+        $feedback = ($ratingData && $ratingData->feedback) ? $ratingData->feedback : '-';
+        
+        $message  = "*[TICKET CLOSED & RATED]*\n\n";
+        $message .= "Ticket Number: *{$ticket->ticket_number}*\n";
+        $message .= "Title: {$ticket->title}\n";
+        $message .= "Rating: ⭐ {$ratingValue}/5\n";
+        $message .= "Feedback: {$feedback}\n\n";
+        $message .= "Tiket telah ditutup secara resmi oleh Requester. Terima kasih atas kerja keras tim IT!";
+
+        return $this->sendMessage($to, $message);
+    }
+
     /**
      * Helper untuk memformat nomor HP (mengubah Awalan 0 menjadi 62)
      */

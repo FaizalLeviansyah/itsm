@@ -115,8 +115,8 @@
         </div>
         @endif
 
-        <!-- Reopen Button -->
-        @if(in_array($ticket->status, ['resolved', 'closed']) && $ticket->requester_id === Auth::id())
+        <!-- KODE BARU -->
+        @if($ticket->status === 'resolved' && $ticket->requester_id === Auth::id())
         <div class="bg-white rounded-xl border border-red-100 p-5">
             <div class="flex items-center gap-3 mb-3">
                 <div class="w-9 h-9 bg-red-50 rounded-lg flex items-center justify-center"><i class="fas fa-redo text-red-500 text-sm"></i></div>
@@ -151,7 +151,10 @@
                     <div class="flex-1 bg-blue-50/50 border border-blue-100 rounded-lg p-3">
                         <p class="text-sm text-gray-700">
                             <span class="font-medium">{{ $history->user->name }}</span> •
-                            @if($history->field === 'status') changed status to <span class="font-medium">{{ ucfirst(str_replace('_',' ',$history->new_value)) }}</span>
+                            @if($history->field === 'status') changed status to 
+                                <span class="font-medium">
+                                    {{ $history->new_value === 'resolved' ? 'Resolved (waiting User Confirmation)' : ucfirst(str_replace('_',' ',$history->new_value)) }}
+                                </span>
                             @elseif($history->field === 'assigned_to') assigned to <span class="font-medium">{{ $history->new_value }}</span>
                             @else {{ $history->note ?? "updated {$history->field}" }}
                             @endif
@@ -293,8 +296,10 @@
                 </div>
                 <div class="flex justify-between text-xs">
                     <span class="text-gray-500">Status</span>
-                    @php $sc = ['open'=>'text-blue-600','assigned'=>'text-sky-600','in_progress'=>'text-indigo-600','pending'=>'text-amber-600','resolved'=>'text-green-600','closed'=>'text-gray-500','cancelled'=>'text-red-600']; @endphp
-                    <span class="font-medium {{ $sc[$ticket->status] ?? '' }}">{{ ucfirst(str_replace('_',' ',$ticket->status)) }}</span>
+                    @php $sc = ['open'=>'text-blue-600','assigned'=>'text-sky-600','in_progress'=>'text-indigo-600','pending'=>'text-amber-600','resolved'=>'text-yellow-600','closed'=>'text-gray-500','cancelled'=>'text-red-600']; @endphp
+                    <span class="font-medium {{ $sc[$ticket->status] ?? '' }}">
+                        {{ $ticket->status === 'resolved' ? 'Resolved (waiting User Confirmation)' : ucfirst(str_replace('_',' ',$ticket->status)) }}
+                    </span>
                 </div>
                 @if($ticket->assignee)
                 <div class="flex justify-between text-xs">
@@ -382,7 +387,9 @@
                 @endphp
                 
                 @foreach($statuses as $s)
-                <option value="{{ $s }}" {{ $ticket->status == $s ? 'selected' : '' }}>{{ ucfirst(str_replace('_',' ',$s)) }}</option>
+                <option value="{{ $s }}" {{ $ticket->status == $s ? 'selected' : '' }}>
+                    {{ $s === 'resolved' ? 'Resolved (waiting User Confirmation)' : ucfirst(str_replace('_',' ',$s)) }}
+                </option>
                 @endforeach
             </select>
             <textarea name="resolution_notes" rows="3" class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm mb-4" placeholder="Resolution notes (optional)..."></textarea>

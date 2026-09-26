@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Asset;
 use App\Models\Category;
-use App\Models\Company; // <-- Import Model Company
+use App\Models\Company;
 use App\Models\Priority;
 use App\Models\SubCategory;
 use App\Models\Ticket;
@@ -17,6 +17,8 @@ use App\Services\SlaCalculator;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class TicketController extends Controller
 {
@@ -28,6 +30,67 @@ class TicketController extends Controller
         $this->waService = $waService;
         $this->slaCalculator = $slaCalculator;
     }
+
+    /**
+     * Helper privat untuk menembak notifikasi langsung ke WA Admin
+     */
+    private function notifyAdminViaWa(Ticket $ticket, string $actionName, string $extraNote = '')
+    {
+        try {
+            $adminPhone = env('WA_DEFAULT_TO', '628563339320'); // Nomor admin
+            $message  = "*[ADMIN ALERT - TICKET UPDATE]*\n\n";
+            $message .= "Ticket: *{$ticket->ticket_number}*\n";
+            $message .= "Title: {$ticket->title}\n";
+            $message .= "Action: *{$actionName}*\n";
+            $message .= "By: " . Auth::user()->name . "\n";
+            if ($extraNote) {
+                $message .= "Note: {$extraNote}\n";
+            }
+            $this->waService->sendMessage($adminPhone, $message);
+        } catch (\Exception $e) {
+            Log::error('WA Admin Alert Failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Helper privat BARU: Mengirim notifikasi ke semua pihak (Requester, Technician, Admin)
+     * tanpa duplikat dan tidak mengirim ke diri sendiri.
+     */
+    private function sendStatusUpdateNotifications(Ticket $ticket, string $oldStatus, string $newStatus)
+{
+    // Jika status tidak berubah, hentikan
+    if ($oldStatus === $newStatus) {
+        return;
+    }
+
+    $recipients = collect();
+
+    // 1. Masukkan Requester (pembuat tiket)
+    if ($ticket->requester_id && $ticket->requester) {
+        $recipients->push($ticket->requester);
+    }
+
+    // 2. Masukkan Technician (jika ada yang ditugaskan)
+    if ($ticket->assigned_to && $ticket->assignee) {
+        $recipients->push($ticket->assignee);
+    }
+
+    // 3. Masukkan SEMUA Admin aktif
+    $admins = User::where('role', 'admin')->where('is_active', true)->get();
+    $recipients = $recipients->merge($admins);
+
+    // 4. Hapus duplikat ID pengguna (Hapus fungsi reject actor agar email tetap masuk ke Admin saat di-test)
+    $finalRecipients = $recipients->filter()->unique('id');
+
+    // 5. Kirim Notifikasi Email & Database
+    foreach ($finalRecipients as $user) {
+        try {
+            $user->notify(new TicketNotification($ticket, $newStatus));
+        } catch (\Exception $e) {
+            Log::error("Gagal mengirim email notifikasi ke {$user->email}: " . $e->getMessage());
+        }
+    }
+}
 
     public function index(Request $request)
     {
@@ -41,7 +104,6 @@ class TicketController extends Controller
             }
         }
 
-        // Filters...
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
@@ -73,7 +135,6 @@ class TicketController extends Controller
         $categories = Category::with('subCategories')->where('is_active', true)->get();
         $priorities = Priority::orderBy('sort_order')->get();
         $assets = Asset::where('assigned_to', Auth::id())->orWhereNull('assigned_to')->get();
-        
         $companies = Company::where('is_active', true)->orderBy('name')->get(); 
 
         return view('tickets.create', compact('categories', 'priorities', 'assets', 'companies'));
@@ -81,7 +142,6 @@ class TicketController extends Controller
 
     public function store(Request $request)
     {
-        // Hapus validasi company_id karena otomatis ditarik dari Auth User
         $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'required|string',
@@ -100,7 +160,7 @@ class TicketController extends Controller
             'sub_category_id' => $request->sub_category_id,
             'priority_id' => $request->priority_id,
             'requester_id' => Auth::id(),
-            'company_id' => Auth::user()->company_id, // <-- KUNCI AUTO ASSIGN
+            'company_id' => Auth::user()->company_id,
             'type' => $request->type,
             'impact' => $request->impact ?? 'low',
             'urgency' => $request->urgency ?? 'low',
@@ -118,19 +178,15 @@ class TicketController extends Controller
                 'status' => 'pending',
             ]);
             $ticket->update(['status' => 'pending']);
-
-            $admins = User::where('role', 'admin')->get();
-            foreach ($admins as $admin) {
-                $admin->notify(new TicketNotification($ticket, 'approval_required'));
-            }
         } else {
             $autoAssignee = \App\Models\AutoAssignRule::findAssignee(
                 $request->category_id,
                 $request->sub_category_id,
-                Auth::user()->company_id, // <-- Gunakan dari Auth User
+                Auth::user()->company_id,
                 $request->vessel_name,
                 Auth::user()->source
             );
+            
             if ($autoAssignee) {
                 $ticket->update([
                     'assigned_to' => $autoAssignee,
@@ -174,7 +230,10 @@ class TicketController extends Controller
         ]);
 
         $ticket->load(['requester', 'priority', 'category', 'company']);
+        
+        // Notifikasi WA
         $this->waService->notifyTicketCreated($ticket);
+        $this->notifyAdminViaWa($ticket, 'Ticket Created', 'Kategori: ' . $ticket->category->name);
 
         $admins = User::where('role', 'admin')->get();
         foreach ($admins as $admin) {
@@ -212,18 +271,13 @@ class TicketController extends Controller
 
     public function assign(Request $request, Ticket $ticket)
     {
-        $request->validate([
-            'assigned_to' => 'required|exists:users,id',
-        ]);
+        $request->validate(['assigned_to' => 'required|exists:users,id']);
 
-        // --- PROTEKSI BACKEND (LOGIC HOLE FIX) ---
         $targetUser = User::find($request->assigned_to);
         
-        // Jika yang login Technician, pastikan dia HANYA bisa melempar ke Admin
         if (Auth::user()->role === 'technician' && $targetUser->role !== 'admin') {
             return back()->with('error', 'Akses ditolak: Technician hanya dapat melakukan Reassign ke Admin.');
         }
-        // -----------------------------------------
 
         $oldAssignee = $ticket->assigned_to;
         $ticket->update([
@@ -243,7 +297,10 @@ class TicketController extends Controller
         ]);
 
         $ticket->load(['assignee', 'requester', 'priority']);
+        
+        // Notifikasi WA
         $this->waService->notifyTicketAssigned($ticket);
+        $this->notifyAdminViaWa($ticket, 'Ticket Assigned', 'Assigned to: ' . $targetUser->name);
 
         $ticket->assignee->notify(new TicketNotification($ticket, 'assigned'));
 
@@ -252,24 +309,24 @@ class TicketController extends Controller
 
     public function updateStatus(Request $request, Ticket $ticket)
     {
+        // [GEMBOK PERMANEN] Kunci tiket yang sudah Closed dari semua role kecuali Admin
+        if ($ticket->status === 'closed' && Auth::user()->role !== 'admin') {
+            return back()->with('error', 'Tiket yang sudah ditutup (Closed) terkunci permanen. Hanya Admin yang dapat merubahnya.');
+        }
+
         $request->validate([
             'status' => 'required|in:open,assigned,in_progress,pending,resolved,closed,cancelled',
         ]);
 
-        // --- PROTEKSI BACKEND (LOGIC HOLE FIX) ---
-        // 1. Technician dilarang keras men-set status ke 'closed'
         if (Auth::user()->role === 'technician' && $request->status === 'closed') {
             return back()->with('error', 'Akses ditolak: Technician tidak diizinkan menutup (Close) tiket.');
         }
 
-        // 2. Jika Admin ingin force close tiket yang resolved tapi belum dirating, kita izinkan.
-        // Jika selain Admin (misal dari sistem lain), tetap kita blokir.
         if ($request->status === 'closed' && $ticket->status === 'resolved' && !$ticket->rating) {
             if (Auth::user()->role !== 'admin') {
                 return back()->with('error', 'Ticket cannot be closed until the requester provides a rating.');
             }
         }
-        // -----------------------------------------
 
         $oldStatus = $ticket->status;
         $data = ['status' => $request->status];
@@ -291,14 +348,22 @@ class TicketController extends Controller
             'field' => 'status',
             'old_value' => $oldStatus,
             'new_value' => $request->status,
-            'note' => $request->resolution_notes ?? null, // Diperbaiki dari $request->notes agar log deskripsi masuk
+            'note' => $request->resolution_notes ?? null,
         ]);
 
+        // Pastikan relasi diload untuk notifikasi
+        $ticket->load(['assignee', 'requester', 'priority']);
+
+        // WA Alert Default dari kodingan lama
+        $this->notifyAdminViaWa($ticket, 'Status Changed to ' . strtoupper($request->status), $request->resolution_notes ?? '-');
         if ($request->status === 'resolved') {
-            $ticket->load(['assignee', 'requester', 'priority']);
             $this->waService->notifyTicketResolved($ticket);
-            $ticket->requester->notify(new TicketNotification($ticket, 'resolved'));
         }
+
+        // ======================================================================
+        // PEMANGGILAN LOGIKA NOTIFIKASI BARU (Email / App Notifications)
+        // ======================================================================
+        $this->sendStatusUpdateNotifications($ticket, $oldStatus, $request->status);
 
         return back()->with('success', 'Ticket status updated successfully.');
     }
@@ -318,48 +383,61 @@ class TicketController extends Controller
 
     public function reopen(Request $request, Ticket $ticket)
     {
+        // Pastikan hanya requester yang bisa reopen
         if ($ticket->requester_id !== Auth::id()) {
             abort(403);
         }
 
-        if (!in_array($ticket->status, ['resolved', 'closed'])) {
-            return back()->with('error', 'Only resolved or closed tickets can be reopened.');
+        // HANYA bisa di-reopen jika statusnya masih 'resolved' (Awaiting User Confirmation)
+        if ($ticket->status !== 'resolved') {
+            return back()->with('error', 'Hanya tiket dengan status Resolved yang dapat dibuka kembali.');
         }
 
         $request->validate(['reason' => 'required|string|max:500']);
 
+        // Ubah status KEMBALI KE 'in_progress'
         $ticket->update([
-            'status' => 'open',
-            'resolved_at' => null,
-            'closed_at' => null,
-            'sla_breached' => false,
+            'status' => 'in_progress',
+            'resolved_at' => null, 
+            // SLA breached tidak direset agar riwayat SLA tetap valid
         ]);
 
         TicketHistory::create([
             'ticket_id' => $ticket->id,
             'user_id' => Auth::id(),
             'field' => 'status',
-            'old_value' => 'closed',
-            'new_value' => 'open',
-            'note' => 'Reopened: ' . $request->reason,
+            'old_value' => 'resolved',
+            'new_value' => 'in_progress',
+            'note' => 'Reopened oleh Requester: ' . $request->reason,
         ]);
 
+        // Notifikasi WA Alert & Email ke Admin
+        $this->notifyAdminViaWa($ticket, 'Ticket Reopened', 'Alasan: ' . $request->reason);
+
+        // Notifikasi WA & Email ke Teknisi
         if ($ticket->assignee) {
             $ticket->load(['requester', 'priority', 'assignee']);
+            $this->waService->sendMessage(
+                $ticket->assignee->phone, 
+                "*[TICKET REOPENED]*\n\nTiket {$ticket->ticket_number} dibuka kembali oleh Requester dengan alasan:\n{$request->reason}\n\nStatus saat ini kembali menjadi *In Progress*."
+            );
             $ticket->assignee->notify(new TicketNotification($ticket, 'reopened', $request->reason));
         }
 
-        return back()->with('success', 'Ticket reopened successfully.');
+        // Jalankan notifikasi sistem menyeluruh yang baru kita buat
+        $this->sendStatusUpdateNotifications($ticket, 'resolved', 'in_progress');
+
+        return back()->with('success', 'Tiket belum selesai. Status dikembalikan ke In Progress dan Teknisi telah diberitahu.');
     }
 
     public function getSubCategories($categoryId)
     {
-        $subCategories = \App\Models\SubCategory::where('category_id', $categoryId)
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->get(['id', 'name']);
-
-        return response()->json($subCategories);
+        return response()->json(
+            SubCategory::where('category_id', $categoryId)
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->get(['id', 'name'])
+        );
     }
 
     public function edit(Ticket $ticket)
@@ -416,7 +494,6 @@ class TicketController extends Controller
             'action' => 'required|in:assign,close,cancel',
         ]);
 
-        // PROTEKSI TAMBAHAN: Cegah Technician melakukan Bulk Close
         if ($request->action === 'close' && Auth::user()->role === 'technician') {
             return back()->with('error', 'Akses ditolak: Technician tidak diizinkan melakukan Close tiket massal.');
         }
@@ -443,32 +520,22 @@ class TicketController extends Controller
 
         return back()->with('success', "{$count} tickets updated successfully.");
     }
-    
-    // ==========================================
-    // TAMBAHAN BARU: OPSI 1 (Selesai & Rating)
-    // ==========================================
-    // ==========================================
-    // TAMBAHAN BARU: OPSI 1 (Selesai & Rating)
-    // ==========================================
+
     public function rateAndClose(Request $request, Ticket $ticket)
     {
-        // 1. Validasi hanya requester yang bisa melakukan ini
         if ($ticket->requester_id !== Auth::id()) {
             abort(403, 'Unauthorized action.');
         }
 
-        // 2. Pastikan status tiket sudah 'resolved' oleh teknisi
         if ($ticket->status !== 'resolved') {
             return back()->with('error', 'Hanya tiket dengan status Resolved yang dapat diulas dan ditutup.');
         }
 
-        // 3. Validasi input rating 1-5 dan komentar
         $request->validate([
             'rating' => 'required|integer|min:1|max:5',
             'feedback' => 'nullable|string|max:1000'
         ]);
 
-        // 4. Simpan data rating ke tabel ticket_ratings
         $ticket->rating()->create([
             'user_id' => Auth::id(),
             'technician_id' => $ticket->assigned_to,
@@ -477,13 +544,11 @@ class TicketController extends Controller
             'resolution_time_minutes' => $ticket->resolution_time,
         ]);
 
-        // 5. Ubah status tiket menjadi Closed
         $ticket->update([
             'status' => 'closed',
             'closed_at' => now(),
         ]);
 
-        // 6. Catat log history bahwa tiket ditutup oleh requester beserta ratingnya
         TicketHistory::create([
             'ticket_id' => $ticket->id,
             'user_id' => Auth::id(),
@@ -493,18 +558,20 @@ class TicketController extends Controller
             'note' => 'Tiket diselesaikan oleh requester dengan rating: ' . $request->rating . ' Bintang',
         ]);
 
-        // 7. Trigger WhatsApp Service & Notifikasi
         try {
-            // Load relasi agar data assignee (nomor HP) dan rating dapat ditarik oleh WA Service
             $ticket->load(['assignee', 'rating']);
+            
+            // WA ke Teknisi
             $this->waService->notifyTicketClosed($ticket);
             
-            // Opsional: Jika Anda juga menggunakan in-app notification dari database Laravel
+            // WA ke Admin
+            $this->notifyAdminViaWa($ticket, 'Ticket Closed & Rated', 'Rating: ' . $request->rating . '/5');
+
             if ($ticket->assignee) {
                 $ticket->assignee->notify(new TicketNotification($ticket, 'closed'));
             }
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Gagal mengirim WA Rate & Close: ' . $e->getMessage());
+            Log::error('Gagal mengirim WA Rate & Close: ' . $e->getMessage());
         }
 
         return back()->with('success', 'Terima kasih! Tiket telah berhasil ditutup dan ulasan Anda telah disimpan.');

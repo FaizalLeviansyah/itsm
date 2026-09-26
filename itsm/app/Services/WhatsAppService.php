@@ -114,6 +114,22 @@ class WhatsAppService
         return $this->sendMessage($to, $message);
     }
 
+    public function notifyAdminActivity(Ticket $ticket, string $actionName, string $actionBy)
+    {
+        // Selalu kirim ke nomor Admin (defaultTo)
+        $to = $this->defaultTo;
+        
+        $message  = "*[ADMIN ALERT - TICKET UPDATE]*\n\n";
+        $message .= "Ticket: *{$ticket->ticket_number}*\n";
+        $message .= "Title: {$ticket->title}\n";
+        $message .= "Action: *{$actionName}*\n";
+        $message .= "By: {$actionBy}\n";
+        $message .= "Status Saat Ini: {$ticket->status}\n\n";
+        $message .= "Mohon cek sistem ITSM untuk detail lebih lanjut.";
+
+        return $this->sendMessage($to, $message);
+    }
+
     /**
      * Helper untuk memformat nomor HP (mengubah Awalan 0 menjadi 62)
      */

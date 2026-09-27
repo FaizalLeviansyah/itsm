@@ -150,7 +150,8 @@
                     </div>
                     <div class="flex-1 bg-blue-50/50 border border-blue-100 rounded-lg p-3">
                         <p class="text-sm text-gray-700">
-                            <span class="font-medium">{{ $history->user->name }}</span> •
+                            <!-- Amankan history user -->
+                            <span class="font-medium">{{ $history->user?->name ?? 'System / User Terhapus' }}</span> •
                             @if($history->field === 'status') changed status to 
                                 <span class="font-medium">
                                     {{ $history->new_value === 'resolved' ? 'Resolved (waiting User Confirmation)' : ucfirst(str_replace('_',' ',$history->new_value)) }}
@@ -167,11 +168,13 @@
                 @foreach($ticket->comments as $comment)
                 <div class="flex gap-3">
                     <div class="w-8 h-8 {{ $comment->is_internal ? 'bg-amber-100' : 'bg-gray-100' }} rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <span class="text-[10px] font-bold {{ $comment->is_internal ? 'text-amber-700' : 'text-gray-600' }}">{{ strtoupper(substr($comment->user->name, 0, 2)) }}</span>
+                        <!-- Amankan inisial avatar comment -->
+                        <span class="text-[10px] font-bold {{ $comment->is_internal ? 'text-amber-700' : 'text-gray-600' }}">{{ strtoupper(substr($comment->user?->name ?? 'NA', 0, 2)) }}</span>
                     </div>
                     <div class="flex-1 {{ $comment->is_internal ? 'bg-amber-50 border-amber-100' : 'bg-gray-50 border-gray-100' }} border rounded-lg p-3">
                         <div class="flex items-center gap-2 mb-1">
-                            <span class="text-sm font-medium text-gray-800">{{ $comment->user->name }}</span>
+                            <!-- Amankan nama komentator -->
+                            <span class="text-sm font-medium text-gray-800">{{ $comment->user?->name ?? 'User Non-Aktif' }}</span>
                             @if($comment->is_internal)<span class="text-[10px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-medium">Internal</span>@endif
                             <span class="text-xs text-gray-400">{{ $comment->created_at->diffForHumans() }}</span>
                         </div>
@@ -226,11 +229,13 @@
             <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Requester Info</p>
             <div class="flex items-center gap-3 mb-4">
                 <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-                    <span class="text-sm font-bold text-gray-600">{{ strtoupper(substr($ticket->requester->name, 0, 2)) }}</span>
+                    <!-- Gunakan ?-> dan berikan default string 'NA' jika null -->
+                    <span class="text-sm font-bold text-gray-600">{{ strtoupper(substr($ticket->requester?->name ?? 'NA', 0, 2)) }}</span>
                 </div>
                 <div>
-                    <p class="text-sm font-semibold text-gray-900">{{ $ticket->requester->name }}</p>
-                    <p class="text-xs text-gray-500">{{ $ticket->requester->position ?? $ticket->requester->role }}</p>
+                    <!-- Amankan nama requester -->
+                    <p class="text-sm font-semibold text-gray-900">{{ $ticket->requester?->name ?? 'User Non-Aktif' }}</p>
+                    <p class="text-xs text-gray-500">{{ $ticket->requester?->position ?? ($ticket->requester?->role ?? 'N/A') }}</p>
                 </div>
             </div>
             <div class="space-y-2 text-sm">
@@ -240,9 +245,10 @@
                     <span class="text-gray-800 font-medium">{{ $ticket->company->name }}</span>
                 </div>
                 @endif
-                @if($ticket->requester->department)<div class="flex justify-between"><span class="text-gray-500">Department</span><span class="text-gray-800 font-medium">{{ $ticket->requester->department }}</span></div>@endif
+                <!-- Tambahkan tanda ? pada relasi department dan phone -->
+                @if($ticket->requester?->department)<div class="flex justify-between"><span class="text-gray-500">Department</span><span class="text-gray-800 font-medium">{{ $ticket->requester->department }}</span></div>@endif
                 @if($ticket->location)<div class="flex justify-between"><span class="text-gray-500">Location</span><span class="text-gray-800 font-medium">{{ $ticket->location }}</span></div>@endif
-                @if($ticket->requester->phone)<div class="flex justify-between"><span class="text-gray-500">Contact</span><span class="text-brand-600 font-medium">{{ $ticket->requester->phone }}</span></div>@endif
+                @if($ticket->requester?->phone)<div class="flex justify-between"><span class="text-gray-500">Contact</span><span class="text-brand-600 font-medium">{{ $ticket->requester->phone }}</span></div>@endif
             </div>
         </div>
 
@@ -304,7 +310,8 @@
                 @if($ticket->assignee)
                 <div class="flex justify-between text-xs">
                     <span class="text-gray-500">Assignee</span>
-                    <span class="text-gray-700 font-medium">{{ $ticket->assignee->name }}</span>
+                    <!-- Amankan nama assignee -->
+                    <span class="text-gray-700 font-medium">{{ $ticket->assignee?->name ?? 'Teknisi Non-Aktif' }}</span>
                 </div>
                 @endif
             </div>

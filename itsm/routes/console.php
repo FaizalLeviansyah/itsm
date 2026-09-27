@@ -8,6 +8,9 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+// TAMBAHKAN DI SINI
+Schedule::command('tickets:auto-close')->dailyAt('00:00');
+
 // Check SLA breach every 15 minutes
 Schedule::command('tickets:check-sla')->everyFifteenMinutes();
 

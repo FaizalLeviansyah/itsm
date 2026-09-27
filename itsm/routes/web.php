@@ -22,6 +22,7 @@ use App\Http\Controllers\ServiceCatalogController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\VesselDashboardController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schedule;
 
 // Auth Routes
 Route::get('/', fn() => redirect('/login'));
@@ -52,7 +53,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/tickets/{ticket}/assign', [TicketController::class, 'assign'])->name('tickets.assign');
     Route::post('/tickets/{ticket}/status', [TicketController::class, 'updateStatus'])->name('tickets.status');
     Route::post('/tickets/{ticket}/comment', [TicketController::class, 'addComment'])->name('tickets.comment');
-    Route::post('/tickets/{ticket}/reopen', [TicketController::class, 'reopen'])->name('tickets.reopen');
+    Route::post('/tickets/{ticket}/reopen', [TicketController::class, 'reopen'])->name('tickets.reopen')->middleware('throttle:1,1');
+
+    // ---> TAMBAHKAN RUTE ATTACHMENT DI SINI <---
+    Route::get('/tickets/{ticket}/attachments/{attachment}', [TicketController::class, 'downloadAttachment'])->name('tickets.attachment.download');
     
     // ---> TAMBAHKAN BARIS INI DI SINI <---
     Route::post('/tickets/{ticket}/rate-and-close', [TicketController::class, 'rateAndClose'])->name('tickets.rateAndClose');

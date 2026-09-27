@@ -10,37 +10,51 @@
     <style>body { font-family: 'Inter', sans-serif; }</style>
 </head>
 <body class="min-h-screen bg-white flex">
-    <!-- Left: Branding -->
-    <div class="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 items-center justify-center p-12 relative overflow-hidden">
+    <!-- Left: Branding (Two-tone Blue Gradient) -->
+    <div class="hidden lg:flex lg:w-3/5 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-900 items-center justify-center p-12 relative overflow-hidden">
         <div class="absolute inset-0 opacity-10">
             <div class="absolute top-20 left-20 w-64 h-64 bg-white rounded-full blur-3xl"></div>
             <div class="absolute bottom-20 right-20 w-80 h-80 bg-white rounded-full blur-3xl"></div>
         </div>
-        <div class="relative text-center max-w-md">
-            <div class="w-16 h-16 bg-white/10 backdrop-blur rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <i class="fas fa-headset text-3xl text-white"></i>
+        <div class="relative max-w-xl">
+            <!-- Logo Amarin Ship Management -->
+            <div class="flex items-center gap-4 mb-8">
+                <div class="w-14 h-14 rounded-2xl bg-white flex items-center justify-center overflow-hidden shadow-lg">
+                    <img src="{{ asset('storage/companies/OZhBiZbGGW5cbErTTOVLpXHflaJcfZsM8ycrj1Ev.jpg') }}" alt="Amarin Logo" class="w-full h-full object-cover">
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-white leading-tight">Amarin Ship Management</h2>
+                    <p class="text-xs text-blue-200">IT Department</p>
+                </div>
             </div>
-            <h1 class="text-3xl font-bold text-white mb-3">ITSM Portal</h1>
-            <p class="text-blue-100 text-base leading-relaxed">IT Service Management System for managing IT services professionally and measurably.</p>
-            <div class="grid grid-cols-3 gap-4 mt-10">
-                <div class="bg-white/10 backdrop-blur rounded-xl p-4">
-                    <p class="text-2xl font-bold text-white">24/7</p>
-                    <p class="text-xs text-blue-200 mt-1">Support</p>
+
+            <h1 class="text-3xl lg:text-4xl font-bold text-white mb-4 leading-tight">
+                IT Service Management Portal
+            </h1>
+            <p class="text-blue-100 text-base leading-relaxed mb-8">
+                One platform to manage IT services, support tickets, and assets professionally and measurably. Secure, intelligent, and seamlessly connected.
+            </p>
+
+            <!-- Motto R.E.S.P.E.C.T -->
+            <div class="pt-2">
+                <div class="flex flex-wrap gap-2 mb-3">
+                    <div class="w-9 h-9 flex items-center justify-center rounded-lg bg-white/10 border border-white/20 font-bold text-sm text-white backdrop-blur-sm">R</div>
+                    <div class="w-9 h-9 flex items-center justify-center rounded-lg bg-white/10 border border-white/20 font-bold text-sm text-white backdrop-blur-sm">E</div>
+                    <div class="w-9 h-9 flex items-center justify-center rounded-lg bg-white/10 border border-white/20 font-bold text-sm text-white backdrop-blur-sm">S</div>
+                    <div class="w-9 h-9 flex items-center justify-center rounded-lg bg-white/10 border border-white/20 font-bold text-sm text-white backdrop-blur-sm">P</div>
+                    <div class="w-9 h-9 flex items-center justify-center rounded-lg bg-white/10 border border-white/20 font-bold text-sm text-white backdrop-blur-sm">E</div>
+                    <div class="w-9 h-9 flex items-center justify-center rounded-lg bg-white/10 border border-white/20 font-bold text-sm text-white backdrop-blur-sm">C</div>
+                    <div class="w-9 h-9 flex items-center justify-center rounded-lg bg-white/10 border border-white/20 font-bold text-sm text-white backdrop-blur-sm">T</div>
                 </div>
-                <div class="bg-white/10 backdrop-blur rounded-xl p-4">
-                    <p class="text-2xl font-bold text-white">98%</p>
-                    <p class="text-xs text-blue-200 mt-1">SLA Met</p>
-                </div>
-                <div class="bg-white/10 backdrop-blur rounded-xl p-4">
-                    <p class="text-2xl font-bold text-white">4.8</p>
-                    <p class="text-xs text-blue-200 mt-1">Rating</p>
-                </div>
+                <p class="text-[11px] text-blue-200/80 font-medium tracking-widest uppercase">
+                    Responsible &bull; Ethic &bull; Safety &bull; People &bull; Environment &bull; Care &bull; Trust
+                </p>
             </div>
         </div>
     </div>
 
-    <!-- Right: Login Form -->
-    <div class="flex-1 flex items-center justify-center p-6 lg:p-12">
+    <!-- Right: Login Form (Clean White Background) -->
+    <div class="flex-2 flex-1 flex items-center justify-center p-6 lg:p-12 bg-white">
         <div class="w-full max-w-sm">
             <div class="lg:hidden text-center mb-8">
                 <div class="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-3">
@@ -92,14 +106,14 @@
                         </label>
                     </div>
 
-                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition text-sm">
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition text-sm shadow-md shadow-blue-500/20">
                         Sign In
                     </button>
                 </div>
             </form>
 
             <p class="text-center text-xs text-gray-400 mt-8">
-                &copy; {{ date('Y') }} Amarin Ship Management
+                &copy; {{ date('Y') }} Amarin Ship Management &mdash; IT Department
             </p>
         </div>
     </div>

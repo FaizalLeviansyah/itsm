@@ -148,6 +148,10 @@ class TicketController extends Controller
             'category_id' => 'required|exists:categories,id',
             'priority_id' => 'required|exists:priorities,id',
             'type' => 'required|in:incident,service_request,problem,change_request',
+            'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx|max:5120', // Maksimal 5MB
+        ], [
+            'attachments.*.mimes' => 'Format file lampiran tidak diizinkan. Gunakan JPG, PNG, PDF, atau Office.',
+            'attachments.*.max' => 'Ukuran setiap file lampiran maksimal 5MB.'
         ]);
 
         $priority = Priority::find($request->priority_id);
@@ -207,16 +211,18 @@ class TicketController extends Controller
             $ticket->assets()->attach($request->assets);
         }
 
-        if ($request->hasFile('attachments')) {
+                if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments') as $file) {
-                $path = $file->store('tickets/' . $ticket->id, 'public');
+                // Ubah 'private' menjadi 'local'
+                $path = $file->store('tickets/' . $ticket->id, 'local'); 
+                
                 $ticket->attachments()->create([
                     'user_id' => Auth::id(),
                     'filename' => basename($path),
                     'original_name' => $file->getClientOriginalName(),
                     'mime_type' => $file->getMimeType(),
                     'size' => $file->getSize(),
-                    'path' => $path,
+                    'path' => $path, // Ini akan menyimpan string seperti: "tickets/12/namafile.jpg"
                 ]);
             }
         }
@@ -242,6 +248,33 @@ class TicketController extends Controller
 
         return redirect()->route('tickets.show', $ticket)->with('success', 'Ticket created successfully.');
     }
+
+    public function downloadAttachment(Ticket $ticket, Attachment $attachment)
+{
+    $user = Auth::user();
+
+    // 1. Otorisasi (Mencegah IDOR)
+    $isRequester = $ticket->requester_id === $user->id;
+    $isAssignedTechnician = $ticket->assigned_to === $user->id;
+    $isAdmin = $user->role === 'admin';
+
+    if (!$isRequester && (!$isAssignedTechnician || $user->role !== 'technician') && !$isAdmin) {
+        abort(403, 'Anda tidak memiliki akses ke berkas lampiran ini.');
+    }
+
+    // 2. Pastikan attachment ini benar-benar milik tiket yang diminta di URL (Extra Security)
+    if ($attachment->ticket_id !== $ticket->id) {
+        abort(404, 'File lampiran tidak valid untuk tiket ini.');
+    }
+
+    // 3. Cek eksistensi file fisik di server (Disk 'local')
+    if (!Storage::disk('local')->exists($attachment->path)) {
+        abort(404, 'File fisik lampiran tidak ditemukan di server.');
+    }
+
+    // 4. Download file menggunakan nama asli saat diupload
+    return Storage::disk('local')->download($attachment->path, $attachment->original_name);
+}
 
     public function show(Ticket $ticket)
     {

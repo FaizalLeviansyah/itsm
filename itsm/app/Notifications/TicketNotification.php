@@ -4,12 +4,17 @@ namespace App\Notifications;
 
 use App\Models\Ticket;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class TicketNotification extends Notification
+class TicketNotification extends Notification implements ShouldQueue
 {
     use Queueable;
+
+    // Pengaturan retry jika API WhatsApp / SMTP gagal
+    public $tries = 3;
+    public $backoff = 10; // Coba lagi setelah 10 detik
 
     protected Ticket $ticket;
     protected string $type;
@@ -22,9 +27,10 @@ class TicketNotification extends Notification
         $this->message = $message;
     }
 
-    public function via($notifiable): array
+    // Tentukan channel notifikasi
+    public function via($notifiable)
     {
-        return ['mail', 'database'];
+        return ['database', 'mail', \App\Channels\WhatsAppChannel::class];
     }
 
     public function toMail($notifiable): MailMessage

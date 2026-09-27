@@ -11,6 +11,10 @@ class TicketReassignNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
+    // Pengaturan retry jika API WhatsApp / SMTP gagal
+    public $tries = 3;
+    public $backoff = 10; // Coba lagi setelah 10 detik
+
     protected $ticket;
     protected $technician;
 

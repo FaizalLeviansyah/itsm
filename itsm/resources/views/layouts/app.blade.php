@@ -86,6 +86,59 @@
     </style>
 </head>
 <body class="h-full bg-[#f8fafc]">
+    <!-- Global Preloader Splash Screen (Animasi Loncat, Bold, & Ukuran Besar) -->
+    <div id="itsm-preloader" class="fixed inset-0 z-[9999] bg-[#f8fafc] flex flex-col items-center justify-center transition-opacity duration-700">
+        <!-- Animasi Cincin & Logo -->
+        <div class="relative flex items-center justify-center mb-6">
+            <!-- Outer Spinning Ring -->
+            <div class="absolute w-36 h-36 border-4 border-transparent border-t-blue-600 border-b-blue-600 rounded-full animate-spin"></div>
+            <!-- Inner Spinning Ring (Reverse) -->
+            <div class="absolute w-28 h-28 border-4 border-transparent border-l-blue-400 border-r-blue-400 rounded-full animate-[spin_1.5s_reverse_infinite]"></div>
+            
+            <!-- Logo Amarin -->
+            <div class="w-18 h-18 w-20 h-20 bg-white rounded-2xl flex items-center justify-center overflow-hidden shadow-xl z-10 p-2 border border-blue-100">
+                <img src="{{ asset('storage/companies/OZhBiZbGGW5cbErTTOVLpXHflaJcfZsM8ycrj1Ev.jpg') }}" alt="Amarin Logo" class="w-full h-full object-contain">
+            </div>
+        </div>
+        
+        <!-- Kontainer Teks dengan Efek Loncat (Slide Up) & Bold Besar -->
+        <div class="text-center px-6 max-w-lg">
+            <!-- Teks Utama: ITSM (Sangat Bold & Besar) -->
+            <h2 class="text-4xl font-black text-gray-900 tracking-wider mb-2 animate-[slideUp_0.6s_cubic-bezier(0.16,1,0.3,1)_0.2s_both]">
+                ITSM PORTAL
+            </h2>
+            
+            <!-- Kepanjangan (Bold & Lebih Jelas) -->
+            <p class="text-xs font-extrabold text-blue-600 tracking-[0.25em] uppercase mb-4 animate-[slideUp_0.6s_cubic-bezier(0.16,1,0.3,1)_0.7s_both]">
+                Information Technology Service Management
+            </p>
+            
+            <!-- Definisi & Motto Bahasa Indonesia (Loncat Bertahap, Besar & Bold) -->
+            <div class="space-y-1.5 overflow-hidden">
+                <p class="text-sm font-bold text-gray-800 tracking-wide animate-[slideUp_0.6s_cubic-bezier(0.16,1,0.3,1)_1.3s_both]">
+                    &ldquo;Optimalisasi Layanan & Infrastruktur Digital Armada&rdquo;
+                </p>
+                <p class="text-xs font-bold text-blue-700 tracking-wide animate-[slideUp_0.6s_cubic-bezier(0.16,1,0.3,1)_1.9s_both]">
+                    Connecting Vessels, Securing Data, Reliable Support, Secure Operations.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Penghilang Preloader (~4.5 Detik) -->
+    <script>
+        window.addEventListener('load', function() {
+            const preloader = document.getElementById('itsm-preloader');
+            if (preloader) {
+                setTimeout(() => {
+                    preloader.style.opacity = '0';
+                    setTimeout(() => {
+                        preloader.style.display = 'none';
+                    }, 700);
+                }, 4000);
+            }
+        });
+    </script>
     <div class="min-h-full flex">
         <!-- Sidebar -->
         <aside class="hidden lg:flex lg:flex-col w-[240px] bg-white border-r border-gray-200 fixed inset-y-0 z-30">

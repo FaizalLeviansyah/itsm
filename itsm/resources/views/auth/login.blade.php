@@ -4,10 +4,37 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Login - ITSM Portal</title>
+    <link rel="icon" type="image/jpeg" href="{{ asset('storage/companies/OZhBiZbGGW5cbErTTOVLpXHflaJcfZsM8ycrj1Ev.jpg') }}">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="{{ asset('manifest.json') }}">
+    <meta name="theme-color" content="#1d4ed8">
+    <link rel="apple-touch-icon" href="{{ asset('storage/companies/OZhBiZbGGW5cbErTTOVLpXHflaJcfZsM8ycrj1Ev.jpg') }}">
+    <meta name="mobile-web-app-capable" content="yes">
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js');
+            });
+        }
+    </script>
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <style>body { font-family: 'Inter', sans-serif; }</style>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Animasi Pop-up Loncat Halus */
+        @keyframes float-smooth {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+        .animate-float-smooth {
+            animation: float-smooth 3s ease-in-out infinite;
+        }
+    </style>
 </head>
 <body class="min-h-screen bg-white flex">
     <!-- Left: Branding (Two-tone Blue Gradient) -->
@@ -118,12 +145,69 @@
         </div>
     </div>
 
+    <!-- PWA Install Prompt Custom Pop-up Card -->
+    <div id="pwa-install-popup-login" style="display: none;" class="fixed top-5 left-1/2 -translate-x-1/2 lg:top-8 lg:right-8 lg:left-auto lg:translate-x-0 z-[100] w-[92vw] max-w-sm">
+        <div class="animate-float-smooth bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 flex items-center gap-4 relative overflow-hidden">
+            <!-- Dekorasi Gradient -->
+            <div class="absolute top-0 left-0 w-1.5 h-full bg-blue-600"></div>
+            
+            <div class="w-12 h-12 flex-shrink-0 bg-blue-50 rounded-xl flex items-center justify-center p-2 border border-blue-100">
+                <img src="{{ asset('storage/companies/OZhBiZbGGW5cbErTTOVLpXHflaJcfZsM8ycrj1Ev.jpg') }}" alt="Amarin Logo" class="w-full h-full object-contain rounded">
+            </div>
+            <div class="flex-1">
+                <h4 class="text-[13px] font-bold text-gray-900 leading-tight">Install Aplikasi ITSM</h4>
+                <p class="text-[11px] text-gray-500 mt-1 leading-snug">Dapatkan pengalaman lebih cepat dan akses langsung dari layar utama perangkat Anda.</p>
+            </div>
+            <div class="flex flex-col gap-2">
+                <button id="btn-install-login" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-md shadow-blue-500/30">
+                    Install
+                </button>
+                <button id="btn-close-login" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-[11px] font-medium rounded-lg transition-colors">
+                    Nanti
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         function togglePassword() {
             const input = document.getElementById('password');
             const icon = document.getElementById('eye-icon');
             if (input.type === 'password') { input.type = 'text'; icon.classList.replace('fa-eye', 'fa-eye-slash'); }
             else { input.type = 'password'; icon.classList.replace('fa-eye-slash', 'fa-eye'); }
+        }
+
+        // PWA Install Prompt Listener dengan Custom Animasi Card
+        let deferredPromptLogin;
+        const pwaPopupLogin = document.getElementById('pwa-install-popup-login');
+        const btnInstallLogin = document.getElementById('btn-install-login');
+        const btnCloseLogin = document.getElementById('btn-close-login');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPromptLogin = e;
+            if (pwaPopupLogin) {
+                pwaPopupLogin.style.display = 'block';
+            }
+        });
+
+        if (btnInstallLogin) {
+            btnInstallLogin.addEventListener('click', async () => {
+                if (!deferredPromptLogin) return;
+                deferredPromptLogin.prompt();
+                const { outcome } = await deferredPromptLogin.userChoice;
+                if (outcome === 'accepted') {
+                    console.log('PWA berhasil diinstal dari halaman Login');
+                }
+                deferredPromptLogin = null;
+                pwaPopupLogin.style.display = 'none';
+            });
+        }
+
+        if (btnCloseLogin) {
+            btnCloseLogin.addEventListener('click', () => {
+                pwaPopupLogin.style.display = 'none';
+            });
         }
     </script>
 </body>

@@ -5,11 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Dashboard') - ITSM Portal</title>
+    <link rel="icon" type="image/jpeg" href="{{ asset('storage/companies/OZhBiZbGGW5cbErTTOVLpXHflaJcfZsM8ycrj1Ev.jpg') }}">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
+
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="{{ asset('manifest.json') }}">
+    <meta name="theme-color" content="#1d4ed8">
+    <link rel="apple-touch-icon" href="{{ asset('storage/companies/OZhBiZbGGW5cbErTTOVLpXHflaJcfZsM8ycrj1Ev.jpg') }}">
+    <meta name="mobile-web-app-capable" content="yes">
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js').then(function(registration) {
+                    console.log('PWA ServiceWorker registered');
+                }).catch(function(err) {
+                    console.log('PWA ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+    </script>
+    
     <script>
         tailwind.config = {
             theme: {
@@ -52,6 +74,15 @@
         ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
         @keyframes ripple { to { transform: scale(4); opacity: 0; } }
+        
+        /* Animasi Pop-up Loncat Halus */
+        @keyframes float-smooth {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+        .animate-float-smooth {
+            animation: float-smooth 3s ease-in-out infinite;
+        }
     </style>
 </head>
 <body class="h-full bg-[#f8fafc]">
@@ -60,8 +91,8 @@
         <aside class="hidden lg:flex lg:flex-col w-[240px] bg-white border-r border-gray-200 fixed inset-y-0 z-30">
             <div class="h-16 flex items-center px-5 border-b border-gray-100">
                 <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center animate-wave">
-                        <i class="fas fa-headset text-white text-xs"></i>
+                    <div class="w-9 h-9 bg-white rounded-lg flex items-center justify-center overflow-hidden shadow-sm border border-gray-100">
+                        <img src="{{ asset('storage/companies/OZhBiZbGGW5cbErTTOVLpXHflaJcfZsM8ycrj1Ev.jpg') }}" alt="Amarin Logo" class="w-full h-full object-cover">
                     </div>
                     <div>
                         <p class="text-sm font-bold text-gray-900 leading-none">ITSM Portal</p>
@@ -120,15 +151,15 @@
             </nav>
 
             <!-- Tombol Log Out -->
-<div class="p-4 border-t border-gray-100 mt-auto">
-    <form action="{{ route('logout') }}" method="POST">
-        @csrf
-        <button type="submit" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition">
-            <i class="fas fa-sign-out-alt text-base"></i>
-            <span>Log Out</span>
-        </button>
-    </form>
-</div>
+            <div class="p-4 border-t border-gray-100 mt-auto">
+                <form action="{{ route('logout') }}" method="POST">
+                    @csrf
+                    <button type="submit" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition">
+                        <i class="fas fa-sign-out-alt text-base"></i>
+                        <span>Log Out</span>
+                    </button>
+                </form>
+            </div>
 
             <div class="p-4 border-t border-gray-100">
                 <a href="{{ route('tickets.create') }}" class="btn-wave flex items-center justify-center gap-2 w-full bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold py-3 rounded-lg transition-all hover:shadow-lg hover:shadow-brand-500/25">
@@ -197,8 +228,8 @@
         <aside class="relative w-[260px] bg-white h-full shadow-2xl overflow-y-auto animate-slide-up">
             <div class="h-16 flex items-center px-5 border-b border-gray-100">
                 <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-headset text-white text-xs"></i>
+                    <div class="w-9 h-9 bg-white rounded-lg flex items-center justify-center overflow-hidden shadow-sm border border-gray-100">
+                        <img src="{{ asset('storage/companies/OZhBiZbGGW5cbErTTOVLpXHflaJcfZsM8ycrj1Ev.jpg') }}" alt="Amarin Logo" class="w-full h-full object-cover">
                     </div>
                     <p class="text-sm font-bold text-gray-900">ITSM Portal</p>
                 </div>
@@ -221,6 +252,30 @@
                 </a>
             </div>
         </aside>
+    </div>
+
+    <!-- PWA Install Prompt Custom Pop-up Card -->
+    <div id="pwa-install-popup-app" style="display: none;" class="fixed top-5 left-1/2 -translate-x-1/2 lg:left-[calc(50%+120px)] z-[100] w-[92vw] max-w-sm">
+        <div class="animate-float-smooth bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 flex items-center gap-4 relative overflow-hidden">
+            <!-- Dekorasi Gradient -->
+            <div class="absolute top-0 left-0 w-1.5 h-full bg-brand-500"></div>
+            
+            <div class="w-12 h-12 flex-shrink-0 bg-brand-50 rounded-xl flex items-center justify-center p-2 border border-brand-100">
+                <img src="{{ asset('storage/companies/OZhBiZbGGW5cbErTTOVLpXHflaJcfZsM8ycrj1Ev.jpg') }}" alt="Amarin Logo" class="w-full h-full object-contain rounded">
+            </div>
+            <div class="flex-1">
+                <h4 class="text-[13px] font-bold text-gray-900 leading-tight">Install ITSM Portal</h4>
+                <p class="text-[11px] text-gray-500 mt-1 leading-snug">Akses lebih cepat, ringan, dan notifikasi real-time langsung dari Home Screen Anda.</p>
+            </div>
+            <div class="flex flex-col gap-2">
+                <button id="btn-install-app" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-md shadow-brand-500/30">
+                    Install
+                </button>
+                <button id="btn-close-app" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-[11px] font-medium rounded-lg transition-colors">
+                    Nanti
+                </button>
+            </div>
+        </div>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -368,6 +423,40 @@
                 }
             });
         });
+    </script>
+    <script>
+        // PWA Install Prompt Listener dengan Custom Animasi Card
+        let deferredPromptApp;
+        const pwaPopupApp = document.getElementById('pwa-install-popup-app');
+        const btnInstallApp = document.getElementById('btn-install-app');
+        const btnCloseApp = document.getElementById('btn-close-app');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPromptApp = e;
+            if (pwaPopupApp) {
+                pwaPopupApp.style.display = 'block';
+            }
+        });
+
+        if (btnInstallApp) {
+            btnInstallApp.addEventListener('click', async () => {
+                if (!deferredPromptApp) return;
+                deferredPromptApp.prompt();
+                const { outcome } = await deferredPromptApp.userChoice;
+                if (outcome === 'accepted') {
+                    console.log('PWA berhasil diinstal dari Dashboard');
+                }
+                deferredPromptApp = null;
+                pwaPopupApp.style.display = 'none';
+            });
+        }
+
+        if (btnCloseApp) {
+            btnCloseApp.addEventListener('click', () => {
+                pwaPopupApp.style.display = 'none';
+            });
+        }
     </script>
     @stack('scripts')
 </body>

@@ -12,9 +12,8 @@ class TicketNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    // Pengaturan retry jika API WhatsApp / SMTP gagal
     public $tries = 3;
-    public $backoff = 10; // Coba lagi setelah 10 detik
+    public $backoff = 10;
 
     protected Ticket $ticket;
     protected string $type;
@@ -27,7 +26,6 @@ class TicketNotification extends Notification implements ShouldQueue
         $this->message = $message;
     }
 
-    // Tentukan channel notifikasi
     public function via($notifiable)
     {
         return ['database', 'mail', \App\Channels\WhatsAppChannel::class];
@@ -35,131 +33,157 @@ class TicketNotification extends Notification implements ShouldQueue
 
     public function toMail($notifiable): MailMessage
     {
-        // Pengecekan role/posisi penerima email
-        $isRequester = $notifiable->id === $this->ticket->requester_id;
-        $mail = (new MailMessage)->subject($this->getSubject($isRequester));
+        $isRequester = ($notifiable->id === $this->ticket->requester_id);
+        $isAdmin = ($notifiable->role === 'admin');
+        
+        $logoUrl = asset('storage/companies/OZhBiZbGGW5cbErTTOVLpXHflaJcfZsM8ycrj1Ev.jpg');
+
+        $mail = (new MailMessage)
+            ->subject($this->getSubject($isRequester))
+            ->line("![Amarin Logo]({$logoUrl})");
 
         switch ($this->type) {
             case 'created':
                 if ($isRequester) {
-                    $mail->greeting('New Ticket Created')
+                    $mail->greeting("Dear {$notifiable->name},")
                          ->line("Your ticket **{$this->ticket->ticket_number}** has been successfully submitted.");
+                } elseif ($isAdmin) {
+                    $mail->greeting("Dear Admin {$notifiable->name},")
+                         ->line("A new ticket **{$this->ticket->ticket_number}** has been created.")
+                         ->line("**Requested by:** " . ($this->ticket->requester->name ?? 'User'));
                 } else {
-                    $mail->greeting('New Ticket Alert')
-                         ->line("A new ticket **{$this->ticket->ticket_number}** has been created by **{$this->ticket->requester->name}**.");
+                    $mail->greeting("Dear {$notifiable->name},")
+                         ->line("A new ticket **{$this->ticket->ticket_number}** has been created by **" . ($this->ticket->requester->name ?? 'User') . "**.");
                 }
+
                 $mail->line("**Title:** {$this->ticket->title}")
-                     ->line("**Priority:** {$this->ticket->priority->name}")
-                     ->line("**Category:** {$this->ticket->category->name}")
-                     ->action('View Ticket', url("/tickets/{$this->ticket->id}"));
+                     ->line("**Category:** " . ($this->ticket->category->name ?? '-'))
+                     ->line("**Priority:** " . ($this->ticket->priority->name ?? '-'))
+                     ->line("**Location/Vessel:** " . ($this->ticket->vessel_name ?: ($this->ticket->location ?: 'Office')))
+                     ->action('View Ticket Details', url("/tickets/{$this->ticket->id}"));
                 break;
                 
             case 'open':
             case 'waiting_for_assign':
                 if ($isRequester) {
-                    $mail->greeting('Ticket Status Updated')
-                         ->line("Your ticket **{$this->ticket->ticket_number}** is currently open and waiting to be assigned to a technician.");
+                    $mail->greeting("Dear {$notifiable->name},")
+                         ->line("Your ticket **{$this->ticket->ticket_number}** is open and waiting to be assigned to a technician.");
                 } else {
-                    $mail->greeting('Action Required: Unassigned Ticket')
-                         ->line("Ticket **{$this->ticket->ticket_number}** from **{$this->ticket->requester->name}** is currently Open / Waiting for Assign.")
-                         ->line("Please review and assign a technician.");
+                    $greetingName = $isAdmin ? "Dear Admin {$notifiable->name}," : "Dear {$notifiable->name},";
+                    $mail->greeting($greetingName)
+                         ->line("Action Required: Ticket **{$this->ticket->ticket_number}** is currently Open / Waiting for Assign.")
+                         ->line("**Requested by:** " . ($this->ticket->requester->name ?? 'User'));
                 }
                 $mail->line("**Title:** {$this->ticket->title}")
-                     ->action('View Ticket', url("/tickets/{$this->ticket->id}"));
+                     ->action('View Ticket Details', url("/tickets/{$this->ticket->id}"));
                 break;
 
             case 'in_progress':
                 if ($isRequester) {
-                    $mail->greeting('Ticket is In Progress')
+                    $mail->greeting("Dear {$notifiable->name},")
                          ->line("Good news! Your ticket **{$this->ticket->ticket_number}** is now being worked on by our team.");
+                } elseif ($isAdmin) {
+                    $mail->greeting("Dear Admin {$notifiable->name},")
+                         ->line("Ticket **{$this->ticket->ticket_number}** status updated to **In Progress**.")
+                         ->line("**Requested by:** " . ($this->ticket->requester->name ?? 'User'))
+                         ->line("**Assigned Technician:** " . ($this->ticket->assignee->name ?? 'Unassigned'));
                 } else {
-                    $mail->greeting('Ticket Status Updated')
+                    $mail->greeting("Dear {$notifiable->name},")
                          ->line("Ticket **{$this->ticket->ticket_number}** status has been changed to **In Progress**.");
                 }
                 $mail->line("**Title:** {$this->ticket->title}")
-                     ->line("**Priority:** {$this->ticket->priority->name}")
-                     ->action('View Ticket', url("/tickets/{$this->ticket->id}"));
+                     ->line("**Priority:** " . ($this->ticket->priority->name ?? '-'))
+                     ->action('View Ticket Details', url("/tickets/{$this->ticket->id}"));
                 break;
 
             case 'assigned':
                 if ($isRequester) {
-                    $mail->greeting('Technician Assigned')
-                         ->line("Your ticket **{$this->ticket->ticket_number}** has been assigned to a technician.");
+                    $mail->greeting("Dear {$notifiable->name},")
+                         ->line("Your ticket **{$this->ticket->ticket_number}** has been assigned to technician **" . ($this->ticket->assignee->name ?? 'Technician') . "**.");
+                } elseif ($isAdmin) {
+                    $mail->greeting("Dear Admin {$notifiable->name},")
+                         ->line("Ticket **{$this->ticket->ticket_number}** has been assigned.")
+                         ->line("**Requested by:** " . ($this->ticket->requester->name ?? 'User'))
+                         ->line("**Assigned Technician:** " . ($this->ticket->assignee->name ?? 'Unassigned'));
                 } else {
-                    $mail->greeting('Ticket Assigned to You')
+                    $mail->greeting("Dear {$notifiable->name},")
                          ->line("Ticket **{$this->ticket->ticket_number}** has been assigned to you.")
-                         ->line("**Deadline:** " . ($this->ticket->due_date?->format('d M Y H:i') ?? 'Not set'))
-                         ->line('Please respond as soon as possible.');
+                         ->line("**Requested by:** " . ($this->ticket->requester->name ?? 'User'))
+                         ->line("**Deadline:** " . ($this->ticket->due_date?->format('d M Y H:i') ?? 'Not set'));
                 }
                 $mail->line("**Title:** {$this->ticket->title}")
-                     ->line("**Priority:** {$this->ticket->priority->name}")
-                     ->action('View Ticket', url("/tickets/{$this->ticket->id}"));
+                     ->action('View Ticket Details', url("/tickets/{$this->ticket->id}"));
                 break;
 
             case 'resolved':
                 if ($isRequester) {
-                    $mail->greeting('Your Ticket Has Been Resolved')
-                         ->line("Ticket **{$this->ticket->ticket_number}** has been resolved.")
+                    $mail->greeting("Dear {$notifiable->name},")
+                         ->line("Your ticket **{$this->ticket->ticket_number}** has been resolved.")
                          ->line("**Title:** {$this->ticket->title}")
                          ->line("**Resolved by:** " . ($this->ticket->assignee->name ?? 'Technician'))
                          ->line('⭐ Please provide your rating to close this ticket.')
-                         ->action('Rate Service', url("/tickets/{$this->ticket->id}"));
-                } else {
-                    $mail->greeting('Ticket Resolved')
+                         ->action('Rate Service & Close Ticket', url("/tickets/{$this->ticket->id}"));
+                } elseif ($isAdmin) {
+                    $mail->greeting("Dear Admin {$notifiable->name},")
                          ->line("Ticket **{$this->ticket->ticket_number}** has been marked as resolved.")
                          ->line("**Title:** {$this->ticket->title}")
-                         ->line("**Requester:** {$this->ticket->requester->name}")
-                         ->line("Waiting for requester to provide rating and close the ticket.")
-                         ->action('View Ticket', url("/tickets/{$this->ticket->id}"));
+                         ->line("**Requested by:** " . ($this->ticket->requester->name ?? 'User'))
+                         ->line("**Resolved by Technician:** " . ($this->ticket->assignee->name ?? 'Technician'))
+                         ->line("Status: Awaiting Requester Rating & Closure.")
+                         ->action('View Ticket Details', url("/tickets/{$this->ticket->id}"));
+                } else {
+                    $mail->greeting("Dear {$notifiable->name},")
+                         ->line("Ticket **{$this->ticket->ticket_number}** has been marked as resolved.")
+                         ->line("**Title:** {$this->ticket->title}")
+                         ->line("**Requested by:** " . ($this->ticket->requester->name ?? 'User'))
+                         ->action('View Ticket Details', url("/tickets/{$this->ticket->id}"));
                 }
                 break;
 
             case 'reopened':
                 if ($isRequester) {
-                    $mail->greeting('Ticket Reopened')
+                    $mail->greeting("Dear {$notifiable->name},")
                          ->line("You have successfully reopened ticket **{$this->ticket->ticket_number}**.");
+                } elseif ($isAdmin) {
+                    $mail->greeting("Dear Admin {$notifiable->name},")
+                         ->line("Alert: Ticket **{$this->ticket->ticket_number}** has been reopened by Requester **" . ($this->ticket->requester->name ?? 'User') . "**.")
+                         ->line("**Previously Assigned Technician:** " . ($this->ticket->assignee->name ?? 'Unassigned'));
                 } else {
-                    $mail->greeting('Ticket Reopened Alert')
-                         ->line("Ticket **{$this->ticket->ticket_number}** has been reopened by the requester.")
-                         ->line('Please investigate and resolve again.');
+                    $mail->greeting("Dear {$notifiable->name},")
+                         ->line("Ticket **{$this->ticket->ticket_number}** has been reopened by the requester **" . ($this->ticket->requester->name ?? 'User') . "**.");
                 }
                 $mail->line("**Title:** {$this->ticket->title}")
                      ->line("**Reason:** {$this->message}")
-                     ->action('View Ticket', url("/tickets/{$this->ticket->id}"));
+                     ->action('View Ticket Details', url("/tickets/{$this->ticket->id}"));
                 break;
 
             case 'escalated':
-                $mail->greeting('⚠️ Ticket Escalation')
-                     ->line("Ticket **{$this->ticket->ticket_number}** has been escalated.")
+                $mail->greeting($isAdmin ? "Dear Admin {$notifiable->name}," : "Dear {$notifiable->name},")
+                     ->line("⚠️ Ticket **{$this->ticket->ticket_number}** has been escalated.")
                      ->line("**Title:** {$this->ticket->title}")
+                     ->line("**Requested by:** " . ($this->ticket->requester->name ?? 'User'))
+                     ->line("**Assigned Technician:** " . ($this->ticket->assignee->name ?? 'Unassigned'))
                      ->line("**Reason:** {$this->message}")
-                     ->action('View Ticket', url("/tickets/{$this->ticket->id}"))
-                     ->line('Immediate attention required.');
+                     ->action('View Escalated Ticket', url("/tickets/{$this->ticket->id}"));
                 break;
 
             case 'approval_required':
-                $mail->greeting('Approval Required')
+                $mail->greeting($isAdmin ? "Dear Admin {$notifiable->name}," : "Dear {$notifiable->name},")
                      ->line("Change Request **{$this->ticket->ticket_number}** needs your approval.")
                      ->line("**Title:** {$this->ticket->title}")
-                     ->line("**Requester:** {$this->ticket->requester->name}")
+                     ->line("**Requested by:** " . ($this->ticket->requester->name ?? 'User'))
                      ->action('Review & Approve', url("/tickets/{$this->ticket->id}"));
                 break;
 
-            case 'approval_decided':
-                $mail->greeting('Approval Status Update')
-                     ->line("Change Request **{$this->ticket->ticket_number}** has been {$this->message}.")
-                     ->line("**Title:** {$this->ticket->title}")
-                     ->action('View Ticket', url("/tickets/{$this->ticket->id}"));
-                break;
-
             default:
-                $mail->greeting('Ticket Update')
+                $mail->greeting($isAdmin ? "Dear Admin {$notifiable->name}," : "Dear {$notifiable->name},")
                      ->line($this->message ?: "Ticket **{$this->ticket->ticket_number}** has a new update.")
                      ->line("**Title:** {$this->ticket->title}")
-                     ->action('View Ticket', url("/tickets/{$this->ticket->id}"));
+                     ->line("**Requested by:** " . ($this->ticket->requester->name ?? 'User'))
+                     ->action('View Ticket Details', url("/tickets/{$this->ticket->id}"));
         }
 
-        return $mail->line('Thank you for using Amarin ITSM.');
+        return $mail->salutation("Regards,\nAmarin Ship Management — IT Department");
     }
 
     public function toArray($notifiable): array
@@ -170,13 +194,15 @@ class TicketNotification extends Notification implements ShouldQueue
             'title' => $this->ticket->title,
             'type' => $this->type,
             'message' => $this->message ?: $this->getSubject($notifiable->id === $this->ticket->requester_id),
+            'requester_name' => $this->ticket->requester?->name ?? 'Unknown',
+            'assignee_name' => $this->ticket->assignee?->name ?? 'Unassigned',
+            'vessel_name' => $this->ticket->vessel_name ?? null,
         ];
     }
 
     private function getSubject(bool $isRequester): string
     {
-        // Custom subjek jika diperlukan perbedaan antara requester dan admin
-        $prefix = "[ITSM]";
+        $prefix = "[Amarin ITSM]";
         
         return match ($this->type) {
             'created' => "{$prefix} " . ($isRequester ? "Ticket Submitted: {$this->ticket->ticket_number}" : "New Ticket Alert: {$this->ticket->ticket_number}"),

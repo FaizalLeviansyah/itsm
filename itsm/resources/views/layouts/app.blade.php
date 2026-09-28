@@ -2,7 +2,8 @@
 <html lang="en" class="h-full">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Diperbarui agar skala viewport pas dan tidak memaksa mode desktop di HP Android -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Dashboard') - ITSM Portal</title>
     <link rel="icon" type="image/jpeg" href="{{ asset('storage/companies/OZhBiZbGGW5cbErTTOVLpXHflaJcfZsM8ycrj1Ev.jpg') }}">
@@ -16,6 +17,8 @@
     <meta name="theme-color" content="#1d4ed8">
     <link rel="apple-touch-icon" href="{{ asset('storage/companies/OZhBiZbGGW5cbErTTOVLpXHflaJcfZsM8ycrj1Ev.jpg') }}">
     <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -86,61 +89,62 @@
     </style>
 </head>
 <body class="h-full bg-[#f8fafc]">
-    <!-- Global Preloader Splash Screen (Animasi Loncat, Bold, & Ukuran Besar) -->
-    <div id="itsm-preloader" class="fixed inset-0 z-[9999] bg-[#f8fafc] flex flex-col items-center justify-center transition-opacity duration-700">
-        <!-- Animasi Cincin & Logo -->
-        <div class="relative flex items-center justify-center mb-6">
-            <!-- Outer Spinning Ring -->
-            <div class="absolute w-36 h-36 border-4 border-transparent border-t-blue-600 border-b-blue-600 rounded-full animate-spin"></div>
-            <!-- Inner Spinning Ring (Reverse) -->
-            <div class="absolute w-28 h-28 border-4 border-transparent border-l-blue-400 border-r-blue-400 rounded-full animate-[spin_1.5s_reverse_infinite]"></div>
+    <!-- Global Preloader Splash Screen (Responsif & Super Mulus) -->
+    <div id="itsm-preloader" class="fixed inset-0 z-[9999] bg-[#f8fafc] flex flex-col items-center justify-center px-4 transition-opacity duration-700">
+        <div class="relative flex items-center justify-center mb-5 scale-90 sm:scale-100">
+            <div class="absolute w-28 h-28 sm:w-36 sm:h-36 border-4 border-transparent border-t-blue-600 border-b-blue-600 rounded-full animate-spin"></div>
+            <div class="absolute w-20 h-20 sm:w-28 sm:h-28 border-4 border-transparent border-l-blue-400 border-r-blue-400 rounded-full animate-[spin_1.5s_reverse_infinite]"></div>
             
-            <!-- Logo Amarin -->
-            <div class="w-18 h-18 w-20 h-20 bg-white rounded-2xl flex items-center justify-center overflow-hidden shadow-xl z-10 p-2 border border-blue-100">
+            <div class="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-2xl flex items-center justify-center overflow-hidden shadow-xl z-10 p-2 border border-blue-100">
                 <img src="{{ asset('storage/companies/OZhBiZbGGW5cbErTTOVLpXHflaJcfZsM8ycrj1Ev.jpg') }}" alt="Amarin Logo" class="w-full h-full object-contain">
             </div>
         </div>
         
-        <!-- Kontainer Teks dengan Efek Loncat (Slide Up) & Bold Besar -->
-        <div class="text-center px-6 max-w-lg">
-            <!-- Teks Utama: ITSM (Sangat Bold & Besar) -->
-            <h2 class="text-4xl font-black text-gray-900 tracking-wider mb-2 animate-[slideUp_0.6s_cubic-bezier(0.16,1,0.3,1)_0.2s_both]">
+        <div class="text-center w-full max-w-[90vw] sm:max-w-lg mx-auto">
+            <h2 class="text-2xl sm:text-4xl font-black text-gray-900 tracking-wider mb-1.5 animate-[slideUp_0.6s_cubic-bezier(0.16,1,0.3,1)_0.2s_both]">
                 ITSM PORTAL
             </h2>
-            
-            <!-- Kepanjangan (Bold & Lebih Jelas) -->
-            <p class="text-xs font-extrabold text-blue-600 tracking-[0.25em] uppercase mb-4 animate-[slideUp_0.6s_cubic-bezier(0.16,1,0.3,1)_0.7s_both]">
+            <p class="text-[10px] sm:text-xs font-extrabold text-blue-600 tracking-[0.15em] sm:tracking-[0.25em] uppercase mb-3 px-2 animate-[slideUp_0.6s_cubic-bezier(0.16,1,0.3,1)_0.7s_both]">
                 Information Technology Service Management
             </p>
-            
-            <!-- Definisi & Motto Bahasa Indonesia (Loncat Bertahap, Besar & Bold) -->
-            <div class="space-y-1.5 overflow-hidden">
-                <p class="text-sm font-bold text-gray-800 tracking-wide animate-[slideUp_0.6s_cubic-bezier(0.16,1,0.3,1)_1.3s_both]">
+            <div class="space-y-1 overflow-hidden px-1">
+                <p class="text-xs sm:text-sm font-bold text-gray-800 tracking-wide animate-[slideUp_0.6s_cubic-bezier(0.16,1,0.3,1)_1.3s_both]">
                     &ldquo;Optimalisasi Layanan & Infrastruktur Digital Armada&rdquo;
                 </p>
-                <p class="text-xs font-bold text-blue-700 tracking-wide animate-[slideUp_0.6s_cubic-bezier(0.16,1,0.3,1)_1.9s_both]">
-                    Connecting Vessels, Securing Data, Reliable Support, Secure Operations.
+                <p class="text-[11px] sm:text-xs font-bold text-blue-700 tracking-wide animate-[slideUp_0.6s_cubic-bezier(0.16,1,0.3,1)_1.9s_both]">
+                    Responsif, Solutif, dan Berdedikasi Tanpa Batas Waktu.
                 </p>
             </div>
         </div>
     </div>
 
-    <!-- Script Penghilang Preloader (~4.5 Detik) -->
+    <!-- Script Kontrol Preloader (4 Detik saat Fresh Login, Instan untuk Navigasi Lain) -->
     <script>
         window.addEventListener('load', function() {
             const preloader = document.getElementById('itsm-preloader');
             if (preloader) {
-                setTimeout(() => {
-                    preloader.style.opacity = '0';
+                const isFreshLogin = sessionStorage.getItem('itsm_fresh_login') === 'true';
+                const hasPreloaded = sessionStorage.getItem('itsm_preloaded') === 'true';
+
+                if (isFreshLogin && !hasPreloaded) {
+                    // Jika baru login, putar animasi penuh selama 4 detik
+                    sessionStorage.setItem('itsm_preloaded', 'true');
+                    sessionStorage.removeItem('itsm_fresh_login');
                     setTimeout(() => {
-                        preloader.style.display = 'none';
-                    }, 700);
-                }, 4000);
+                        preloader.style.opacity = '0';
+                        setTimeout(() => preloader.style.display = 'none', 700);
+                    }, 4000);
+                } else {
+                    // Navigasi biasa antar halaman langsung hilangkan preloader dengan cepat
+                    preloader.style.opacity = '0';
+                    setTimeout(() => preloader.style.display = 'none', 300);
+                }
             }
         });
     </script>
+
     <div class="min-h-full flex">
-        <!-- Sidebar -->
+        <!-- Sidebar (Desktop) -->
         <aside class="hidden lg:flex lg:flex-col w-[240px] bg-white border-r border-gray-200 fixed inset-y-0 z-30">
             <div class="h-16 flex items-center px-5 border-b border-gray-100">
                 <div class="flex items-center gap-3">
@@ -203,7 +207,7 @@
                 @endcan
             </nav>
 
-            <!-- Tombol Log Out -->
+            <!-- Tombol Log Out Desktop -->
             <div class="p-4 border-t border-gray-100 mt-auto">
                 <form action="{{ route('logout') }}" method="POST">
                     @csrf
@@ -221,11 +225,11 @@
             </div>
         </aside>
 
-        <!-- Main -->
-        <main class="lg:pl-[240px] flex-1 min-h-screen">
-            <header class="bg-white/80 backdrop-blur-sm border-b border-gray-200 h-16 flex items-center justify-between px-6 sticky top-0 z-20">
+        <!-- Main Content -->
+        <main class="lg:pl-[240px] flex-1 min-h-screen w-full">
+            <header class="bg-white/80 backdrop-blur-sm border-b border-gray-200 h-16 flex items-center justify-between px-4 lg:px-6 sticky top-0 z-20">
                 <div class="flex items-center gap-4 flex-1">
-                    <button id="mobile-menu-btn" class="lg:hidden text-gray-500 hover:text-gray-700">
+                    <button id="mobile-menu-btn" class="lg:hidden text-gray-500 hover:text-gray-700 p-2 focus:outline-none">
                         <i class="fas fa-bars text-lg"></i>
                     </button>
                     <div class="hidden sm:flex items-center flex-1 max-w-md">
@@ -255,7 +259,7 @@
                 </div>
             </header>
 
-            <div class="p-6 lg:p-8 animate-fade-in">
+            <div class="p-4 lg:p-8 animate-fade-in">
                 @if(session('success'))
                 <div class="mb-5 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center text-sm animate-slide-up" id="alert-success">
                     <i class="fas fa-check-circle mr-3 text-green-500"></i>
@@ -275,32 +279,87 @@
         </main>
     </div>
 
-    <!-- Mobile Sidebar -->
+    <!-- Mobile Sidebar (Lengkap dengan Tombol Log Out & Menu Navigasi Penuh) -->
     <div id="mobile-sidebar" class="fixed inset-0 z-50 hidden lg:hidden">
-        <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" onclick="document.getElementById('mobile-sidebar').classList.add('hidden')"></div>
-        <aside class="relative w-[260px] bg-white h-full shadow-2xl overflow-y-auto animate-slide-up">
-            <div class="h-16 flex items-center px-5 border-b border-gray-100">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="document.getElementById('mobile-sidebar').classList.add('hidden')"></div>
+        <aside class="relative w-[280px] bg-white h-full shadow-2xl flex flex-col overflow-y-auto animate-slide-up">
+            <div class="h-16 flex items-center justify-between px-5 border-b border-gray-100">
                 <div class="flex items-center gap-3">
                     <div class="w-9 h-9 bg-white rounded-lg flex items-center justify-center overflow-hidden shadow-sm border border-gray-100">
                         <img src="{{ asset('storage/companies/OZhBiZbGGW5cbErTTOVLpXHflaJcfZsM8ycrj1Ev.jpg') }}" alt="Amarin Logo" class="w-full h-full object-cover">
                     </div>
-                    <p class="text-sm font-bold text-gray-900">ITSM Portal</p>
+                    <div>
+                        <p class="text-sm font-bold text-gray-900 leading-none">ITSM Portal</p>
+                        <p class="text-[11px] text-gray-400 mt-0.5">Service Management</p>
+                    </div>
                 </div>
+                <button onclick="document.getElementById('mobile-sidebar').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 p-1">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
             </div>
-            <nav class="px-3 py-5 space-y-1">
-                <a href="{{ route('dashboard') }}" class="sidebar-link {{ request()->routeIs('dashboard') ? 'active' : '' }}"><i class="fas fa-th-large w-5 text-center"></i><span>Dashboard</span></a>
-                <a href="{{ route('tickets.index') }}" class="sidebar-link {{ request()->routeIs('tickets.*') ? 'active' : '' }}"><i class="fas fa-ticket-alt w-5 text-center"></i><span>All Tickets</span></a>
-                <a href="{{ route('assets.index') }}" class="sidebar-link {{ request()->routeIs('assets.*') ? 'active' : '' }}"><i class="fas fa-server w-5 text-center"></i><span>Assets</span></a>
-                <a href="{{ route('knowledge.index') }}" class="sidebar-link {{ request()->routeIs('knowledge.*') ? 'active' : '' }}"><i class="fas fa-book-open w-5 text-center"></i><span>Knowledge Base</span></a>
+
+            <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+                <a href="{{ route('dashboard') }}" class="sidebar-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
+                    <i class="fas fa-th-large w-5 text-center"></i><span>Dashboard</span>
+                </a>
+                <a href="{{ route('tickets.index') }}" class="sidebar-link {{ request()->routeIs('tickets.*') && !request()->get('view') ? 'active' : '' }}">
+                    <i class="fas fa-ticket-alt w-5 text-center"></i><span>All Tickets</span>
+                </a>
+                <a href="{{ route('tickets.index', ['view' => 'mine']) }}" class="sidebar-link {{ request()->get('view') === 'mine' ? 'active' : '' }}">
+                    <i class="fas fa-user-check w-5 text-center"></i><span>My Tickets</span>
+                </a>
+                <a href="{{ route('assets.index') }}" class="sidebar-link {{ request()->routeIs('assets.*') ? 'active' : '' }}">
+                    <i class="fas fa-server w-5 text-center"></i><span>Assets</span>
+                </a>
+                <a href="{{ route('audits.index') }}" class="sidebar-link {{ request()->routeIs('audits.*') ? 'active' : '' }}">
+                    <i class="fas fa-clipboard-check w-5 text-center"></i><span>Audit</span>
+                </a>
+                <a href="{{ route('knowledge.index') }}" class="sidebar-link {{ request()->routeIs('knowledge.*') ? 'active' : '' }}">
+                    <i class="fas fa-book-open w-5 text-center"></i><span>Knowledge Base</span>
+                </a>
+                <a href="{{ route('services.index') }}" class="sidebar-link {{ request()->routeIs('services.*') ? 'active' : '' }}">
+                    <i class="fas fa-concierge-bell w-5 text-center"></i><span>Service Catalog</span>
+                </a>
                 @can('viewReports')
-                <a href="{{ route('reports.index') }}" class="sidebar-link {{ request()->routeIs('reports.*') ? 'active' : '' }}"><i class="fas fa-chart-line w-5 text-center"></i><span>Reports</span></a>
+                <div class="pt-3 mt-3 border-t border-gray-100">
+                    <p class="px-4 text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Analytics</p>
+                </div>
+                <a href="{{ route('reports.index') }}" class="sidebar-link {{ request()->routeIs('reports.*') ? 'active' : '' }}">
+                    <i class="fas fa-chart-line w-5 text-center"></i><span>Reports</span>
+                </a>
+                <a href="{{ route('problems.index') }}" class="sidebar-link {{ request()->routeIs('problems.*') ? 'active' : '' }}">
+                    <i class="fas fa-bug w-5 text-center"></i><span>Problems</span>
+                </a>
+                <a href="{{ route('vessels.index') }}" class="sidebar-link {{ request()->routeIs('vessels.*') ? 'active' : '' }}">
+                    <i class="fas fa-ship w-5 text-center"></i><span>Location Overview</span>
+                </a>
                 @endcan
                 @can('manageSettings')
-                <a href="{{ route('admin.settings') }}" class="sidebar-link {{ request()->routeIs('admin.*') ? 'active' : '' }}"><i class="fas fa-cog w-5 text-center"></i><span>Settings</span></a>
+                <div class="pt-3 mt-3 border-t border-gray-100">
+                    <p class="px-4 text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Administration</p>
+                </div>
+                <a href="{{ route('approvals.index') }}" class="sidebar-link {{ request()->routeIs('approvals.*') ? 'active' : '' }}">
+                    <i class="fas fa-check-double w-5 text-center"></i><span>Approvals</span>
+                </a>
+                <a href="{{ route('admin.settings') }}" class="sidebar-link {{ request()->routeIs('admin.*') ? 'active' : '' }}">
+                    <i class="fas fa-cog w-5 text-center"></i><span>Settings</span>
+                </a>
                 @endcan
             </nav>
-            <div class="p-4">
-                <a href="{{ route('tickets.create') }}" class="flex items-center justify-center gap-2 w-full bg-brand-500 text-white text-sm font-semibold py-3 rounded-lg">
+
+            <!-- Tombol Log Out Mobile -->
+            <div class="p-4 border-t border-gray-100 mt-auto bg-gray-50/50">
+                <form action="{{ route('logout') }}" method="POST">
+                    @csrf
+                    <button type="submit" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition">
+                        <i class="fas fa-sign-out-alt text-base"></i>
+                        <span>Log Out</span>
+                    </button>
+                </form>
+            </div>
+
+            <div class="p-4 border-t border-gray-100">
+                <a href="{{ route('tickets.create') }}" class="flex items-center justify-center gap-2 w-full bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold py-3 rounded-lg shadow-md shadow-brand-500/20">
                     <i class="fas fa-plus text-xs"></i> Create Ticket
                 </a>
             </div>
@@ -308,9 +367,8 @@
     </div>
 
     <!-- PWA Install Prompt Custom Pop-up Card -->
-    <div id="pwa-install-popup-app" style="display: none;" class="fixed top-5 left-1/2 -translate-x-1/2 lg:left-[calc(50%+120px)] z-[100] w-[92vw] max-w-sm">
-        <div class="animate-float-smooth bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 flex items-center gap-4 relative overflow-hidden">
-            <!-- Dekorasi Gradient -->
+    <div id="pwa-install-popup-app" style="display: none;" class="fixed top-5 left-1/2 -translate-x-1/2 z-[100] w-[90vw] max-w-sm animate-float-smooth">
+        <div class="bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 flex items-center gap-4 relative overflow-hidden">
             <div class="absolute top-0 left-0 w-1.5 h-full bg-brand-500"></div>
             
             <div class="w-12 h-12 flex-shrink-0 bg-brand-50 rounded-xl flex items-center justify-center p-2 border border-brand-100">
@@ -334,7 +392,6 @@
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <style>
-        /* Select2 custom theme to match Tailwind design */
         .select2-container--default .select2-selection--single {
             height: auto !important;
             padding: 0.5rem 0.75rem;
@@ -354,9 +411,6 @@
             height: 100%;
             top: 0;
             right: 8px;
-        }
-        .select2-container--default .select2-selection--single .select2-selection__placeholder {
-            color: #9ca3af;
         }
         .select2-container--default.select2-container--focus .select2-selection--single,
         .select2-container--default.select2-container--open .select2-selection--single {
@@ -379,10 +433,6 @@
             font-size: 0.8125rem;
             outline: none;
         }
-        .select2-container--default .select2-search--dropdown .select2-search__field:focus {
-            border-color: #2563eb;
-            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
-        }
         .select2-container--default .select2-results__option {
             padding: 0.5rem 0.75rem;
             font-size: 0.875rem;
@@ -391,10 +441,6 @@
             background-color: #2563eb;
             color: #fff;
         }
-        .select2-container--default .select2-results__option[aria-selected=true] {
-            background-color: #eff6ff;
-            color: #1d4ed8;
-        }
         .select2-container--default .select2-selection--multiple {
             border: 1px solid #e5e7eb;
             border-radius: 0.5rem;
@@ -402,34 +448,12 @@
             min-height: 42px;
             font-size: 0.875rem;
         }
-        .select2-container--default.select2-container--focus .select2-selection--multiple {
-            border-color: #2563eb;
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-            outline: none;
-        }
-        .select2-container--default .select2-selection--multiple .select2-selection__choice {
-            background-color: #eff6ff;
-            border: 1px solid #bfdbfe;
-            color: #1d4ed8;
-            border-radius: 0.375rem;
-            padding: 1px 6px;
-            font-size: 0.75rem;
-        }
-        .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
-            color: #60a5fa;
-            margin-right: 4px;
-        }
-        .select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover {
-            color: #1d4ed8;
-        }
-        /* Fix width inside modals */
         .select2-container { width: 100% !important; }
     </style>
     <script>
         document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
             document.getElementById('mobile-sidebar').classList.toggle('hidden');
         });
-        // Auto-dismiss alerts after 5s
         setTimeout(() => {
             document.querySelectorAll('[id^="alert-"]').forEach(el => {
                 el.style.opacity = '0';
@@ -439,8 +463,6 @@
         }, 5000);
     </script>
     <script>
-        // Global Select2 auto-init
-        // Excludes: .no-select2, selects with onchange attribute (filter dropdowns), selects inside audit scan forms
         function initSelect2(context) {
             $(context || document).find('select').not('.no-select2').not('[onchange]').not('.select2-hidden-accessible').each(function() {
                 var $el = $(this);
@@ -457,8 +479,6 @@
         }
         $(document).ready(function() {
             initSelect2();
-
-            // Re-init when modals become visible
             var observer = new MutationObserver(function(mutations) {
                 mutations.forEach(function(m) {
                     if (m.type === 'attributes' && m.attributeName === 'class') {
@@ -469,7 +489,6 @@
                     }
                 });
             });
-            // Watch all elements with "modal" in id (case-insensitive via filter)
             document.querySelectorAll('[id]').forEach(function(el) {
                 if (/modal/i.test(el.id)) {
                     observer.observe(el, { attributes: true });
@@ -478,7 +497,6 @@
         });
     </script>
     <script>
-        // PWA Install Prompt Listener dengan Custom Animasi Card
         let deferredPromptApp;
         const pwaPopupApp = document.getElementById('pwa-install-popup-app');
         const btnInstallApp = document.getElementById('btn-install-app');

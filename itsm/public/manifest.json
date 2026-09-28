@@ -2,11 +2,12 @@
     "name": "Amarin ITSM Portal",
     "short_name": "ITSM Portal",
     "description": "IT Service Management System for Amarin Ship Management",
-    "start_url": "/login",
+    "start_url": "/dashboard",
     "scope": "/",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#1d4ed8",
+    "orientation": "portrait-primary",
     "icons": [
         {
             "src": "/icon-512.png",

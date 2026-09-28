@@ -70,26 +70,28 @@
                     &ldquo;Optimalisasi Layanan & Infrastruktur Digital Armada&rdquo;
                 </p>
                 <p class="text-xs font-bold text-blue-700 tracking-wide animate-[slideUp_0.6s_cubic-bezier(0.16,1,0.3,1)_1.9s_both]">
-                    Connecting Vessels, Securing Data, Reliable Support, Secure Operations.
+                    Responsif, Solutif, dan Berdedikasi Tanpa Batas Waktu.
                 </p>
             </div>
         </div>
     </div>
 
-    <!-- Script Penghilang Preloader (~4.5 Detik) -->
+    <!-- Script Penghilang Preloader di Halaman Login (~4 Detik) -->
     <script>
         window.addEventListener('load', function() {
             const preloader = document.getElementById('itsm-preloader');
             if (preloader) {
+                // Halaman login: Selalu jalankan animasi penuh selama 4 detik setiap dibuka
                 setTimeout(() => {
                     preloader.style.opacity = '0';
                     setTimeout(() => {
                         preloader.style.display = 'none';
-                    }, 700);
-                }, 4000);
+                    }, 300);
+                }, 500);
             }
         });
     </script>
+
     <!-- Left: Branding (Two-tone Blue Gradient) -->
     <div class="hidden lg:flex lg:w-3/5 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-900 items-center justify-center p-12 relative overflow-hidden">
         <div class="absolute inset-0 opacity-10">
@@ -153,7 +155,8 @@
             </div>
             @endif
 
-            <form method="POST" action="{{ route('login') }}">
+            <!-- Form Login dengan Pemicu Fresh Login -->
+            <form id="login-form" method="POST" action="{{ route('login') }}">
                 @csrf
                 <div class="space-y-5">
                     <div>
@@ -228,6 +231,15 @@
             const icon = document.getElementById('eye-icon');
             if (input.type === 'password') { input.type = 'text'; icon.classList.replace('fa-eye', 'fa-eye-slash'); }
             else { input.type = 'password'; icon.classList.replace('fa-eye-slash', 'fa-eye'); }
+        }
+
+        // Tangkap saat form login disubmit untuk memicu preloader penuh 4 detik di dashboard
+        const loginForm = document.getElementById('login-form');
+        if (loginForm) {
+            loginForm.addEventListener('submit', function() {
+                sessionStorage.setItem('itsm_fresh_login', 'true');
+                sessionStorage.removeItem('itsm_preloaded');
+            });
         }
 
         // PWA Install Prompt Listener dengan Custom Animasi Card

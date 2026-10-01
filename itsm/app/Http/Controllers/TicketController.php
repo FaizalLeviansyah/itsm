@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Asset;
+use App\Models\Attachment;
 use App\Models\Category;
 use App\Models\Company;
 use App\Models\Priority;
@@ -18,6 +19,7 @@ use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class TicketController extends Controller
@@ -53,44 +55,37 @@ class TicketController extends Controller
     }
 
     /**
-     * Helper privat BARU: Mengirim notifikasi ke semua pihak (Requester, Technician, Admin)
-     * tanpa duplikat dan tidak mengirim ke diri sendiri.
+     * Helper privat BARU: Mengirim notifikasi ke semua pihak
      */
     private function sendStatusUpdateNotifications(Ticket $ticket, string $oldStatus, string $newStatus)
-{
-    // Jika status tidak berubah, hentikan
-    if ($oldStatus === $newStatus) {
-        return;
-    }
+    {
+        if ($oldStatus === $newStatus) {
+            return;
+        }
 
-    $recipients = collect();
+        $recipients = collect();
 
-    // 1. Masukkan Requester (pembuat tiket)
-    if ($ticket->requester_id && $ticket->requester) {
-        $recipients->push($ticket->requester);
-    }
+        if ($ticket->requester_id && $ticket->requester) {
+            $recipients->push($ticket->requester);
+        }
 
-    // 2. Masukkan Technician (jika ada yang ditugaskan)
-    if ($ticket->assigned_to && $ticket->assignee) {
-        $recipients->push($ticket->assignee);
-    }
+        if ($ticket->assigned_to && $ticket->assignee) {
+            $recipients->push($ticket->assignee);
+        }
 
-    // 3. Masukkan SEMUA Admin aktif
-    $admins = User::where('role', 'admin')->where('is_active', true)->get();
-    $recipients = $recipients->merge($admins);
+        $admins = User::where('role', 'admin')->where('is_active', true)->get();
+        $recipients = $recipients->merge($admins);
 
-    // 4. Hapus duplikat ID pengguna (Hapus fungsi reject actor agar email tetap masuk ke Admin saat di-test)
-    $finalRecipients = $recipients->filter()->unique('id');
+        $finalRecipients = $recipients->filter()->unique('id');
 
-    // 5. Kirim Notifikasi Email & Database
-    foreach ($finalRecipients as $user) {
-        try {
-            $user->notify(new TicketNotification($ticket, $newStatus));
-        } catch (\Exception $e) {
-            Log::error("Gagal mengirim email notifikasi ke {$user->email}: " . $e->getMessage());
+        foreach ($finalRecipients as $user) {
+            try {
+                $user->notify(new TicketNotification($ticket, $newStatus));
+            } catch (\Exception $e) {
+                Log::error("Gagal mengirim email notifikasi ke {$user->email}: " . $e->getMessage());
+            }
         }
     }
-}
 
     public function index(Request $request)
     {
@@ -142,19 +137,28 @@ class TicketController extends Controller
 
     public function store(Request $request)
     {
+        // 1. Perbaiki validasi agar selaras dengan form (request_type -> type, asset_id, impact, urgency)
         $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'required|string',
             'category_id' => 'required|exists:categories,id',
             'priority_id' => 'required|exists:priorities,id',
-            'type' => 'required|in:incident,service_request,problem,change_request',
-            'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx|max:5120', // Maksimal 5MB
+            'request_type' => 'required|in:incident,service_request,problem,change_request', // Sesuaikan nama di form
+            'impact' => 'nullable|string',
+            'urgency' => 'nullable|string',
+            'location' => 'nullable|string|max:255',
+            'vessel_name' => 'nullable|string|max:255',
+            'asset_id' => 'nullable|exists:assets,id',
+            'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx,mp4,mov,avi|max:20480', 
         ], [
-            'attachments.*.mimes' => 'Format file lampiran tidak diizinkan. Gunakan JPG, PNG, PDF, atau Office.',
-            'attachments.*.max' => 'Ukuran setiap file lampiran maksimal 5MB.'
+            'attachments.*.mimes' => 'Format file lampiran tidak diizinkan. Gunakan JPG, PNG, PDF, Office, atau Video (MP4/AVI).',
+            'attachments.*.max' => 'Ukuran setiap file lampiran maksimal 20MB.'
         ]);
 
         $priority = Priority::find($request->priority_id);
+
+        // 2. Petakan 'request_type' dari form ke kolom 'type' di database
+        $ticketType = $request->request_type;
 
         $ticket = Ticket::create([
             'ticket_number' => Ticket::generateTicketNumber(),
@@ -165,7 +169,7 @@ class TicketController extends Controller
             'priority_id' => $request->priority_id,
             'requester_id' => Auth::id(),
             'company_id' => Auth::user()->company_id,
-            'type' => $request->type,
+            'type' => $ticketType,
             'impact' => $request->impact ?? 'low',
             'urgency' => $request->urgency ?? 'low',
             'location' => $request->location,
@@ -173,7 +177,7 @@ class TicketController extends Controller
             'due_date' => $this->slaCalculator->calculateDueDate(now(), $priority->sla_hours ?? 24),
         ]);
 
-        if ($request->type === 'change_request') {
+        if ($ticketType === 'change_request') {
             TicketApproval::create([
                 'ticket_id' => $ticket->id,
                 'requested_by' => Auth::id(),
@@ -207,13 +211,13 @@ class TicketController extends Controller
             }
         }
 
-        if ($request->filled('assets')) {
-            $ticket->assets()->attach($request->assets);
+        // 3. Perbaiki penyimpanan Relasi Asset agar membaca 'asset_id' tunggal dari form
+        if ($request->filled('asset_id')) {
+            $ticket->assets()->attach($request->asset_id);
         }
 
-                if ($request->hasFile('attachments')) {
+        if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments') as $file) {
-                // Ubah 'private' menjadi 'local'
                 $path = $file->store('tickets/' . $ticket->id, 'local'); 
                 
                 $ticket->attachments()->create([
@@ -222,7 +226,7 @@ class TicketController extends Controller
                     'original_name' => $file->getClientOriginalName(),
                     'mime_type' => $file->getMimeType(),
                     'size' => $file->getSize(),
-                    'path' => $path, // Ini akan menyimpan string seperti: "tickets/12/namafile.jpg"
+                    'path' => $path, 
                 ]);
             }
         }
@@ -235,46 +239,55 @@ class TicketController extends Controller
             'note' => 'Ticket created',
         ]);
 
-        $ticket->load(['requester', 'priority', 'category', 'company']);
+        $ticket->load(['requester', 'priority', 'category', 'company', 'attachments']);
         
-        // Notifikasi WA
-        $this->waService->notifyTicketCreated($ticket);
-        $this->notifyAdminViaWa($ticket, 'Ticket Created', 'Kategori: ' . $ticket->category->name);
+        $extraNote = 'Kategori: ' . $ticket->category->name;
+        if ($ticket->attachments->count() > 0) {
+            $extraNote .= "\n\n*Lampiran:* Tersedia " . $ticket->attachments->count() . " file/video.";
+            $extraNote .= "\nAkses detail tiket untuk melihat lampiran: " . route('tickets.show', $ticket->id);
+        }
 
-        $admins = User::where('role', 'admin')->get();
-        foreach ($admins as $admin) {
-            $admin->notify(new TicketNotification($ticket, 'created'));
+        try {
+            $this->waService->notifyTicketCreated($ticket);
+            $this->notifyAdminViaWa($ticket, 'Ticket Created', $extraNote);
+
+            $admins = User::where('role', 'admin')->get();
+            foreach ($admins as $admin) {
+                $admin->notify(new TicketNotification($ticket, 'created'));
+            }
+        } catch (\Exception $e) {
+            Log::error('Notification Failed: ' . $e->getMessage());
         }
 
         return redirect()->route('tickets.show', $ticket)->with('success', 'Ticket created successfully.');
     }
 
     public function downloadAttachment(Ticket $ticket, Attachment $attachment)
-{
-    $user = Auth::user();
+    {
+        $user = Auth::user();
 
-    // 1. Otorisasi (Mencegah IDOR)
-    $isRequester = $ticket->requester_id === $user->id;
-    $isAssignedTechnician = $ticket->assigned_to === $user->id;
-    $isAdmin = $user->role === 'admin';
+        // 1. Otorisasi (Mencegah IDOR)
+        $isRequester = $ticket->requester_id === $user->id;
+        $isAssignedTechnician = $ticket->assigned_to === $user->id;
+        $isAdmin = $user->role === 'admin';
 
-    if (!$isRequester && (!$isAssignedTechnician || $user->role !== 'technician') && !$isAdmin) {
-        abort(403, 'Anda tidak memiliki akses ke berkas lampiran ini.');
+        if (!$isRequester && (!$isAssignedTechnician || $user->role !== 'technician') && !$isAdmin) {
+            abort(403, 'Anda tidak memiliki akses ke berkas lampiran ini.');
+        }
+
+        // 2. Pastikan attachment ini benar-benar milik tiket yang diminta di URL
+        if ($attachment->ticket_id !== $ticket->id) {
+            abort(404, 'File lampiran tidak valid untuk tiket ini.');
+        }
+
+        // 3. Cek eksistensi file fisik di server (Disk 'local')
+        if (!Storage::disk('local')->exists($attachment->path)) {
+            abort(404, 'File fisik lampiran tidak ditemukan di server.');
+        }
+
+        // 4. Download file menggunakan nama asli saat diupload
+        return Storage::disk('local')->download($attachment->path, $attachment->original_name);
     }
-
-    // 2. Pastikan attachment ini benar-benar milik tiket yang diminta di URL (Extra Security)
-    if ($attachment->ticket_id !== $ticket->id) {
-        abort(404, 'File lampiran tidak valid untuk tiket ini.');
-    }
-
-    // 3. Cek eksistensi file fisik di server (Disk 'local')
-    if (!Storage::disk('local')->exists($attachment->path)) {
-        abort(404, 'File fisik lampiran tidak ditemukan di server.');
-    }
-
-    // 4. Download file menggunakan nama asli saat diupload
-    return Storage::disk('local')->download($attachment->path, $attachment->original_name);
-}
 
     public function show(Ticket $ticket)
     {
@@ -331,7 +344,6 @@ class TicketController extends Controller
 
         $ticket->load(['assignee', 'requester', 'priority']);
         
-        // Notifikasi WA
         $this->waService->notifyTicketAssigned($ticket);
         $this->notifyAdminViaWa($ticket, 'Ticket Assigned', 'Assigned to: ' . $targetUser->name);
 
@@ -342,7 +354,6 @@ class TicketController extends Controller
 
     public function updateStatus(Request $request, Ticket $ticket)
     {
-        // [GEMBOK PERMANEN] Kunci tiket yang sudah Closed dari semua role kecuali Admin
         if ($ticket->status === 'closed' && Auth::user()->role !== 'admin') {
             return back()->with('error', 'Tiket yang sudah ditutup (Closed) terkunci permanen. Hanya Admin yang dapat merubahnya.');
         }
@@ -384,18 +395,13 @@ class TicketController extends Controller
             'note' => $request->resolution_notes ?? null,
         ]);
 
-        // Pastikan relasi diload untuk notifikasi
         $ticket->load(['assignee', 'requester', 'priority']);
 
-        // WA Alert Default dari kodingan lama
         $this->notifyAdminViaWa($ticket, 'Status Changed to ' . strtoupper($request->status), $request->resolution_notes ?? '-');
         if ($request->status === 'resolved') {
             $this->waService->notifyTicketResolved($ticket);
         }
 
-        // ======================================================================
-        // PEMANGGILAN LOGIKA NOTIFIKASI BARU (Email / App Notifications)
-        // ======================================================================
         $this->sendStatusUpdateNotifications($ticket, $oldStatus, $request->status);
 
         return back()->with('success', 'Ticket status updated successfully.');
@@ -416,23 +422,19 @@ class TicketController extends Controller
 
     public function reopen(Request $request, Ticket $ticket)
     {
-        // Pastikan hanya requester yang bisa reopen
         if ($ticket->requester_id !== Auth::id()) {
             abort(403);
         }
 
-        // HANYA bisa di-reopen jika statusnya masih 'resolved' (Awaiting User Confirmation)
         if ($ticket->status !== 'resolved') {
             return back()->with('error', 'Hanya tiket dengan status Resolved yang dapat dibuka kembali.');
         }
 
         $request->validate(['reason' => 'required|string|max:500']);
 
-        // Ubah status KEMBALI KE 'in_progress'
         $ticket->update([
             'status' => 'in_progress',
             'resolved_at' => null, 
-            // SLA breached tidak direset agar riwayat SLA tetap valid
         ]);
 
         TicketHistory::create([
@@ -444,10 +446,8 @@ class TicketController extends Controller
             'note' => 'Reopened oleh Requester: ' . $request->reason,
         ]);
 
-        // Notifikasi WA Alert & Email ke Admin
         $this->notifyAdminViaWa($ticket, 'Ticket Reopened', 'Alasan: ' . $request->reason);
 
-        // Notifikasi WA & Email ke Teknisi
         if ($ticket->assignee) {
             $ticket->load(['requester', 'priority', 'assignee']);
             $this->waService->sendMessage(
@@ -457,7 +457,6 @@ class TicketController extends Controller
             $ticket->assignee->notify(new TicketNotification($ticket, 'reopened', $request->reason));
         }
 
-        // Jalankan notifikasi sistem menyeluruh yang baru kita buat
         $this->sendStatusUpdateNotifications($ticket, 'resolved', 'in_progress');
 
         return back()->with('success', 'Tiket belum selesai. Status dikembalikan ke In Progress dan Teknisi telah diberitahu.');
@@ -594,10 +593,7 @@ class TicketController extends Controller
         try {
             $ticket->load(['assignee', 'rating']);
             
-            // WA ke Teknisi
             $this->waService->notifyTicketClosed($ticket);
-            
-            // WA ke Admin
             $this->notifyAdminViaWa($ticket, 'Ticket Closed & Rated', 'Rating: ' . $request->rating . '/5');
 
             if ($ticket->assignee) {

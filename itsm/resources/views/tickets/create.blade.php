@@ -67,11 +67,11 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
                         <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Request Type *</label>
-                        <select name="type" required class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 bg-white">
-                            <option value="incident" {{ old('type','incident') == 'incident' ? 'selected' : '' }}>🚨 Incident</option>
-                            <option value="service_request" {{ old('type') == 'service_request' ? 'selected' : '' }}>🛠 Service Request</option>
-                            <option value="problem" {{ old('type') == 'problem' ? 'selected' : '' }}>🔍 Problem</option>
-                            <option value="change_request" {{ old('type') == 'change_request' ? 'selected' : '' }}>📝 Change Request</option>
+                        <select name="request_type" required class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 bg-white">
+                            <option value="incident" {{ old('request_type','incident') == 'incident' ? 'selected' : '' }}>🚨 Incident</option>
+                            <option value="service_request" {{ old('request_type') == 'service_request' ? 'selected' : '' }}>🛠 Service Request</option>
+                            <option value="problem" {{ old('request_type') == 'problem' ? 'selected' : '' }}>🔍 Problem</option>
+                            <option value="change_request" {{ old('request_type') == 'change_request' ? 'selected' : '' }}>📝 Change Request</option>
                         </select>
                     </div>
                     <div>
@@ -98,15 +98,20 @@
                 <div>
                     <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Upload Attachments</label>
                     <div class="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-brand-400 transition cursor-pointer relative group">
-                        <div class="flex flex-col items-center">
+                        <div class="flex flex-col items-center pointer-events-none">
                             <div class="w-12 h-12 bg-gray-100 group-hover:bg-brand-50 rounded-full flex items-center justify-center mb-3 transition">
                                 <i class="fas fa-cloud-upload-alt text-xl text-gray-400 group-hover:text-brand-500 transition"></i>
                             </div>
                             <p class="text-sm text-gray-600 font-medium">Click to upload or drag files here</p>
-                            <p class="text-xs text-gray-400 mt-1">PNG, JPG, PDF up to 10MB</p>
+                            <p class="text-xs text-gray-400 mt-1">PNG, JPG, PDF, MP4, AVI up to 20MB</p>
                         </div>
-                        <input type="file" name="attachments[]" multiple class="absolute inset-0 opacity-0 cursor-pointer">
+                        <input type="file" id="file-upload" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx,.mp4,.mov,.avi" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="previewFiles()">
                     </div>
+                    
+                    <!-- Kontainer Preview File -->
+                    <div id="file-preview-container" class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 hidden"></div>
+                    
+                    @error('attachments.*') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                 </div>
             </div>
 
@@ -147,16 +152,18 @@
                 </div>
             </div>
 
-            <!-- Related Assets -->
             @if($assets->count() > 0)
             <div class="bg-white rounded-xl border border-gray-100 p-5">
-                <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Related Assets</h4>
-                <select name="assets[]" multiple class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500">
+                <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Related Asset</h4>
+                <select name="asset_id" class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 bg-white">
+                    <option value="">-- Select Asset (Optional) --</option>
                     @foreach($assets as $asset)
-                    <option value="{{ $asset->id }}">{{ $asset->asset_tag }} - {{ $asset->name }}</option>
+                    <option value="{{ $asset->id }}" {{ old('asset_id') == $asset->id ? 'selected' : '' }}>
+                        {{ $asset->asset_tag }} - {{ $asset->name }}
+                    </option>
                     @endforeach
                 </select>
-                <p class="text-[11px] text-gray-400 mt-1.5">Type to search for an asset</p>
+                <p class="text-[11px] text-gray-400 mt-1.5">Select related device or hardware</p>
             </div>
             @endif
 
@@ -207,6 +214,68 @@
 
 @push('scripts')
 <script>
+let selectedFiles = [];
+
+function previewFiles() {
+    const input = document.getElementById('file-upload');
+    const container = document.getElementById('file-preview-container');
+    
+    // Masukkan file baru ke dalam array penampung
+    Array.from(input.files).forEach(file => {
+        selectedFiles.push(file);
+    });
+
+    updateFileInputAndPreview();
+}
+
+function removeFile(index) {
+    selectedFiles.splice(index, 1);
+    updateFileInputAndPreview();
+}
+
+function updateFileInputAndPreview() {
+    const container = document.getElementById('file-preview-container');
+    const input = document.getElementById('file-upload');
+    
+    // Perbarui data pada input file menggunakan DataTransfer
+    const dataTransfer = new DataTransfer();
+    selectedFiles.forEach(file => {
+        dataTransfer.items.add(file);
+    });
+    input.files = dataTransfer.files;
+
+    // Render ulang tampilan preview
+    container.innerHTML = '';
+    if (selectedFiles.length > 0) {
+        container.classList.remove('hidden');
+        selectedFiles.forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const isImage = file.type.startsWith('image/');
+                const previewContent = isImage 
+                    ? `<img src="${e.target.result}" class="w-full h-20 object-cover rounded-lg border border-gray-200">`
+                    : `<div class="w-full h-20 bg-gray-100 rounded-lg border border-gray-200 flex flex-col items-center justify-center p-2 text-center">
+                           <i class="fas fa-file-alt text-gray-400 text-xl mb-1"></i>
+                           <span class="text-[10px] text-gray-500 truncate w-full">${file.name}</span>
+                       </div>`;
+
+                const card = document.createElement('div');
+                card.className = 'relative group/item bg-white p-1 rounded-lg border border-gray-200';
+                card.innerHTML = `
+                    ${previewContent}
+                    <button type="button" onclick="removeFile(${index})" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow hover:bg-red-600 transition">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                container.appendChild(card);
+            }
+            reader.readAsDataURL(file);
+        });
+    } else {
+        container.classList.add('hidden');
+    }
+}
+
 function loadSubCategories(categoryId) {
     const wrap = document.getElementById('subcategory-wrap');
     const select = document.getElementById('sub_category_id');

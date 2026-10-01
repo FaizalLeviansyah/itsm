@@ -108,6 +108,10 @@
                     @endcan
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">ID</th>
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Subject</th>
+                    
+                    <!-- BAGIAN YANG DITAMBAHKAN: Header Kolom Proof -->
+                    <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Proof</th>
+                    
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Priority</th>
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Status</th>
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Category</th>
@@ -131,6 +135,33 @@
                         <p class="text-sm font-medium text-gray-900">{{ Str::limit($ticket->title, 40) }}</p>
                         <p class="text-xs text-gray-400 mt-0.5">{{ Str::limit($ticket->description, 50) }}</p>
                     </td>
+
+                    <!-- BAGIAN YANG DITAMBAHKAN: Data Kolom Proof (Menampilkan Preview Gambar/File) -->
+                    <td class="px-6 py-4">
+                        @if($ticket->attachments && $ticket->attachments->count() > 0)
+                            <div class="flex gap-1">
+                                @foreach($ticket->attachments->take(2) as $att)
+                                    @if(Str::endsWith(strtolower($att->path), ['.jpg', '.jpeg', '.png']))
+                                        <a href="{{ asset('storage/' . $att->path) }}" target="_blank" onclick="event.stopPropagation()" class="block">
+                                            <img src="{{ asset('storage/' . $att->path) }}" class="w-9 h-9 object-cover rounded border border-gray-200 hover:scale-125 transition-transform" title="{{ $att->original_name }}">
+                                        </a>
+                                    @else
+                                        <a href="{{ asset('storage/' . $att->path) }}" target="_blank" onclick="event.stopPropagation()" class="w-9 h-9 bg-gray-50 border border-gray-200 rounded flex items-center justify-center hover:bg-gray-100 transition" title="{{ $att->original_name }}">
+                                            <i class="fas fa-paperclip text-gray-400 text-xs"></i>
+                                        </a>
+                                    @endif
+                                @endforeach
+                                
+                                @if($ticket->attachments->count() > 2)
+                                    <span class="text-[10px] text-gray-500 self-center ml-1">+{{ $ticket->attachments->count() - 2 }}</span>
+                                @endif
+                            </div>
+                        @else
+                            <span class="text-xs text-gray-300">-</span>
+                        @endif
+                    </td>
+                    <!-- AKHIR BAGIAN YANG DITAMBAHKAN -->
+
                     <td class="px-6 py-4">
                         @php $priorityStyles = ['Critical'=>'bg-red-50 text-red-700 border-red-200','High'=>'bg-orange-50 text-orange-700 border-orange-200','Medium'=>'bg-amber-50 text-amber-700 border-amber-200','Low'=>'bg-gray-50 text-gray-600 border-gray-200']; @endphp
                         <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium border {{ $priorityStyles[$ticket->priority->name] ?? 'bg-gray-50 text-gray-600 border-gray-200' }}">
@@ -183,7 +214,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="8" class="px-6 py-16 text-center">
+                    <td colspan="9" class="px-6 py-16 text-center">
                         <i class="fas fa-inbox text-4xl text-gray-200 mb-3"></i>
                         <p class="text-gray-500 font-medium">No tickets found</p>
                         <p class="text-sm text-gray-400 mt-1">Create a new ticket to get IT support</p>

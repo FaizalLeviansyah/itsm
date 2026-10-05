@@ -325,7 +325,10 @@ class TicketController extends Controller
 
     public function assign(Request $request, Ticket $ticket)
     {
-        $request->validate(['assigned_to' => 'required|exists:users,id']);
+        $request->validate([
+            'assigned_to' => 'required|exists:users,id',
+            'note' => 'nullable|string|max:500' // Validasi untuk form catatan
+        ]);
 
         $targetUser = User::find($request->assigned_to);
         
@@ -341,19 +344,22 @@ class TicketController extends Controller
             'status' => 'assigned',
         ]);
 
+        // Prioritaskan catatan dari form, jika kosong gunakan pesan default
+        $historyNote = $request->note ?: (Auth::user()->role === 'technician' ? 'Ticket reassigned to Admin' : 'Ticket assigned to technician');
+
         TicketHistory::create([
             'ticket_id' => $ticket->id,
             'user_id' => Auth::id(),
             'field' => 'assigned_to',
             'old_value' => $oldAssignee ? User::find($oldAssignee)->name : null,
             'new_value' => $targetUser->name,
-            'note' => Auth::user()->role === 'technician' ? 'Ticket reassigned to Admin' : 'Ticket assigned to technician',
+            'note' => $historyNote, // Simpan catatan
         ]);
 
         $ticket->load(['assignee', 'requester', 'priority']);
         
         $this->waService->notifyTicketAssigned($ticket);
-        $this->notifyAdminViaWa($ticket, 'Ticket Assigned', 'Assigned to: ' . $targetUser->name);
+        $this->notifyAdminViaWa($ticket, 'Ticket Assigned', 'Assigned to: ' . $targetUser->name . ($request->note ? "\nCatatan: " . $request->note : ""));
 
         $ticket->assignee->notify(new TicketNotification($ticket, 'assigned'));
 

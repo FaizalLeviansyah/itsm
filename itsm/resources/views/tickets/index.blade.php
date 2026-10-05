@@ -234,6 +234,7 @@
                 </tr>
                 @empty
                 <tr>
+                    <!-- Ubah colspan dari 9 menjadi 11 agar span memenuhi seluruh lebar tabel -->
                     <td colspan="11" class="px-6 py-16 text-center">
                         <i class="fas fa-inbox text-4xl text-gray-200 mb-3"></i>
                         <p class="text-gray-500 font-medium">No tickets found</p>

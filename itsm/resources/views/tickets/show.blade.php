@@ -139,7 +139,7 @@
         </div>
         @endif
 
-        <!-- KODE BARU -->
+        <!-- KODE BARU: REOPEN TICKET -->
         @if($ticket->status === 'resolved' && $ticket->requester_id === Auth::id())
         <div class="bg-white rounded-xl border border-red-100 p-5">
             <div class="flex items-center gap-3 mb-3">
@@ -253,11 +253,9 @@
             <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Requester Info</p>
             <div class="flex items-center gap-3 mb-4">
                 <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-                    <!-- Gunakan ?-> dan berikan default string 'NA' jika null -->
                     <span class="text-sm font-bold text-gray-600">{{ strtoupper(substr($ticket->requester?->name ?? 'NA', 0, 2)) }}</span>
                 </div>
                 <div>
-                    <!-- Amankan nama requester -->
                     <p class="text-sm font-semibold text-gray-900">{{ $ticket->requester?->name ?? 'User Non-Aktif' }}</p>
                     <p class="text-xs text-gray-500">{{ $ticket->requester?->position ?? ($ticket->requester?->role ?? 'N/A') }}</p>
                 </div>
@@ -269,11 +267,79 @@
                     <span class="text-gray-800 font-medium">{{ $ticket->company->name }}</span>
                 </div>
                 @endif
-                <!-- Tambahkan tanda ? pada relasi department dan phone -->
                 @if($ticket->requester?->department)<div class="flex justify-between"><span class="text-gray-500">Department</span><span class="text-gray-800 font-medium">{{ $ticket->requester->department }}</span></div>@endif
                 @if($ticket->location)<div class="flex justify-between"><span class="text-gray-500">Location</span><span class="text-gray-800 font-medium">{{ $ticket->location }}</span></div>@endif
                 @if($ticket->requester?->phone)<div class="flex justify-between"><span class="text-gray-500">Contact</span><span class="text-brand-600 font-medium">{{ $ticket->requester->phone }}</span></div>@endif
             </div>
+        </div>
+
+        <!-- ASSIGNEE INFO DENGAN TIMELINE TRAIL -->
+        <div class="bg-white rounded-xl border border-gray-100 p-6 mb-6">
+            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Assignee Info</h3>
+            
+            @if($ticket->assignee)
+                <div class="flex items-center gap-3">
+                    <!-- Avatar Inisial Teknisi -->
+                    <div class="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                        {{ strtoupper(substr($ticket->assignee->name, 0, 2)) }}
+                    </div>
+                    <div>
+                        <div class="font-semibold text-gray-900">{{ $ticket->assignee->name }}</div>
+                        <div class="text-sm text-gray-500 capitalize">{{ $ticket->assignee->role ?? 'Technician' }}</div>
+                    </div>
+                </div>
+            @else
+                <!-- State Belum Di-assign -->
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-gray-50 text-gray-400 border border-gray-200 border-dashed flex items-center justify-center">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="font-medium text-gray-500">Unassigned</div>
+                        <div class="text-sm text-gray-400">Belum ada teknisi</div>
+                    </div>
+                </div>
+            @endif
+
+            <!-- TIMELINE REASSIGN HISTORY -->
+            @php
+                $assignmentHistories = $ticket->histories->where('field', 'assigned_to')->sortByDesc('created_at');
+            @endphp
+            
+            @if($assignmentHistories->count() > 0)
+                <div class="mt-6 pt-5 border-t border-gray-100">
+                    <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-4">Assignment Trail</h4>
+                    
+                    <div class="space-y-4 pl-2 border-l-2 border-gray-100 ml-2">
+                        @foreach($assignmentHistories as $history)
+                            <div class="relative pl-5">
+                                <!-- Titik Timeline -->
+                                <div class="absolute -left-[23px] top-1 w-2.5 h-2.5 rounded-full bg-blue-400 ring-4 ring-white"></div>
+                                
+                                <div class="text-xs text-gray-600 mb-1">
+                                    <span class="font-semibold text-gray-800">{{ $history->user->name ?? 'System' }}</span> 
+                                    assigned to 
+                                    <span class="font-semibold text-blue-600">{{ $history->new_value }}</span>
+                                </div>
+                                
+                                <!-- Menampilkan Catatan Alasan -->
+                                @if($history->note)
+                                    <div class="text-xs text-gray-600 italic bg-blue-50/50 p-2.5 rounded border border-blue-100/50 mt-1.5 mb-1">
+                                        <i class="fas fa-quote-left text-blue-300 mr-1"></i> {{ $history->note }}
+                                    </div>
+                                @endif
+                                
+                                <!-- Waktu Spesifik -->
+                                <div class="text-[10px] font-medium text-gray-400 flex items-center gap-1 mt-1.5">
+                                    <i class="far fa-clock"></i> {{ $history->created_at->format('d M Y, H:i') }}
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
         </div>
 
         <!-- Assets -->
@@ -334,7 +400,6 @@
                 @if($ticket->assignee)
                 <div class="flex justify-between text-xs">
                     <span class="text-gray-500">Assignee</span>
-                    <!-- Amankan nama assignee -->
                     <span class="text-gray-700 font-medium">{{ $ticket->assignee?->name ?? 'Teknisi Non-Aktif' }}</span>
                 </div>
                 @endif
@@ -368,6 +433,8 @@
         </h3>
         <form action="{{ route('tickets.assign', $ticket) }}" method="POST">
             @csrf
+            
+            <!-- Pilihan Teknisi/Admin -->
             <select name="assigned_to" required class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm mb-4">
                 @if(Auth::user()->role === 'admin')
                     <option value="">Select Technician / Admin</option>
@@ -381,6 +448,10 @@
                     @endforeach
                 @endif
             </select>
+
+            <!-- INPUT CATATAN BARU DITAMBAHKAN DI SINI -->
+            <textarea name="note" rows="2" class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm mb-4" placeholder="{{ Auth::user()->role === 'admin' ? 'Catatan / Alasan Reassign (Opsional)...' : 'Alasan eskalasi ke Admin (Wajib diisi jika perlu)...' }}"></textarea>
+
             <div class="flex justify-end gap-2">
                 <button type="button" onclick="document.getElementById('assign-modal').classList.add('hidden')" class="px-4 py-2 border border-gray-200 rounded-lg text-sm">Cancel</button>
                 <button type="submit" class="px-4 py-2 bg-brand-500 text-white rounded-lg text-sm font-semibold">
@@ -403,20 +474,14 @@
             @csrf
             <select name="status" required class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm mb-3">
                 @php
-                    // 1. Daftar status default (tanpa opsi 'closed')
                     $statuses = ['open','assigned','in_progress','pending','resolved','cancelled'];
-                    
-                    // 2. Tambahkan opsi 'closed' HANYA jika yang login adalah admin
                     if(Auth::user()->role === 'admin') {
                         $statuses[] = 'closed';
                     }
-                    
-                    // 3. Pastikan status saat ini tetap ada di dropdown (mencegah error jika tiket terlanjur closed)
                     if(!in_array($ticket->status, $statuses)) {
                         $statuses[] = $ticket->status;
                     }
                 @endphp
-                
                 @foreach($statuses as $s)
                 <option value="{{ $s }}" {{ $ticket->status == $s ? 'selected' : '' }}>
                     {{ $s === 'resolved' ? 'Resolved (waiting User Confirmation)' : ucfirst(str_replace('_',' ',$s)) }}

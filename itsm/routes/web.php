@@ -38,8 +38,35 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout')->midd
 // Protected Routes
 Route::middleware('auth')->group(function () {
 
- // ---> TAMBAHKAN RUTE ATTACHMENT DI SINI <---
-    Route::get('/tickets/{ticket}/attachments/{attachment}', [TicketController::class, 'downloadAttachment'])->name('tickets.attachment.download');
+ Route::get('/tickets/{ticketId}/attachments/{attachmentId}/download', function($ticketId, $attachmentId) {
+    // 1. Cari data lampiran secara manual (Pastikan TicketAttachment adalah nama model yang benar)
+    $attachment = \App\Models\TicketAttachment::where('id', $attachmentId)
+                    ->where('ticket_id', $ticketId)
+                    ->first();
+
+    if (! $attachment) {
+        abort(404, 'Berkas lampiran tidak ditemukan.');
+    }
+
+    // 2. Deteksi lokasi file
+    $path = $attachment->path;
+    $disk = \Illuminate\Support\Facades\Storage::disk('local')->exists($path) ? 'local' : 'public';
+
+    if (! \Illuminate\Support\Facades\Storage::disk($disk)->exists($path)) {
+        $path = str_replace('storage/', '', $path);
+        if (! \Illuminate\Support\Facades\Storage::disk($disk)->exists($path)) {
+            abort(404, 'File fisik tidak ditemukan di server.');
+        }
+    }
+
+    // 3. Jika ada parameter 'mode=view', tampilkan file langsung di browser (untuk preview index.blade.php)
+    if (request()->query('mode') === 'view') {
+        return \Illuminate\Support\Facades\Storage::disk($disk)->response($path);
+    }
+
+    // 4. Jika tidak ada parameter (klik tombol unduh di show.blade.php), paksa unduh file
+    return \Illuminate\Support\Facades\Storage::disk($disk)->download($path, $attachment->original_name);
+})->middleware('auth')->name('tickets.attachment.download');
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 

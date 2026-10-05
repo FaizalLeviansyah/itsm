@@ -288,6 +288,12 @@ class TicketController extends Controller
         }
     }
 
+    // Jika ada parameter 'mode=view', tampilkan file langsung di browser (tanpa diunduh)
+    if (request()->query('mode') === 'view') {
+        return \Illuminate\Support\Facades\Storage::disk($disk)->response($path);
+    }
+
+    // Jika tidak ada parameter (default), paksa unduh file
     return \Illuminate\Support\Facades\Storage::disk($disk)->download($path, $attachment->original_name);
 }
 

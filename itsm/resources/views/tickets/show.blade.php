@@ -59,7 +59,7 @@
                 <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Attachments ({{ $ticket->attachments->count() }})</p>
                 <div class="space-y-2">
                     @foreach($ticket->attachments as $att)
-                    <a href="{{ asset('storage/' . $att->path) }}" target="_blank" class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                    <a href="{{ route('tickets.attachment.download', ['ticketId' => $ticket->id, 'attachmentId' => $att->id]) }}" class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
                         <div class="w-8 h-8 bg-white border rounded flex items-center justify-center"><i class="fas fa-file text-gray-400 text-xs"></i></div>
                         <span class="text-sm text-gray-700 flex-1">{{ $att->original_name }}</span>
                         <i class="fas fa-download text-gray-400 text-xs"></i>

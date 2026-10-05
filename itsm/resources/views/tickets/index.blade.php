@@ -142,11 +142,11 @@
                             <div class="flex gap-1">
                                 @foreach($ticket->attachments->take(2) as $att)
                                     @if(Str::endsWith(strtolower($att->path), ['.jpg', '.jpeg', '.png']))
-                                        <a href="{{ asset('storage/' . $att->path) }}" target="_blank" onclick="event.stopPropagation()" class="block">
-                                            <img src="{{ asset('storage/' . $att->path) }}" class="w-9 h-9 object-cover rounded border border-gray-200 hover:scale-125 transition-transform" title="{{ $att->original_name }}">
+                                        <a href="{{ route('tickets.attachment.download', ['ticketId' => $ticket->id, 'attachmentId' => $att->id]) }}" target="_blank" onclick="event.stopPropagation()" class="block">
+                                            <img src="{{ route('tickets.attachment.download', ['ticketId' => $ticket->id, 'attachmentId' => $att->id, 'mode' => 'view']) }}" class="w-9 h-9 object-cover rounded border border-gray-200 hover:scale-125 transition-transform" title="{{ $att->original_name }}">
                                         </a>
                                     @else
-                                        <a href="{{ asset('storage/' . $att->path) }}" target="_blank" onclick="event.stopPropagation()" class="w-9 h-9 bg-gray-50 border border-gray-200 rounded flex items-center justify-center hover:bg-gray-100 transition" title="{{ $att->original_name }}">
+                                        <a href="{{ route('tickets.attachment.download', ['ticketId' => $ticket->id, 'attachmentId' => $att->id]) }}" target="_blank" onclick="event.stopPropagation()" class="w-9 h-9 bg-gray-50 border border-gray-200 rounded flex items-center justify-center hover:bg-gray-100 transition" title="{{ $att->original_name }}">
                                             <i class="fas fa-paperclip text-gray-400 text-xs"></i>
                                         </a>
                                     @endif

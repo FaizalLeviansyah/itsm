@@ -37,6 +37,9 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout')->midd
 
 // Protected Routes
 Route::middleware('auth')->group(function () {
+
+ // ---> TAMBAHKAN RUTE ATTACHMENT DI SINI <---
+    Route::get('/tickets/{ticket}/attachments/{attachment}', [TicketController::class, 'downloadAttachment'])->name('tickets.attachment.download');
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
@@ -54,9 +57,6 @@ Route::middleware('auth')->group(function () {
     Route::post('/tickets/{ticket}/status', [TicketController::class, 'updateStatus'])->name('tickets.status');
     Route::post('/tickets/{ticket}/comment', [TicketController::class, 'addComment'])->name('tickets.comment');
     Route::post('/tickets/{ticket}/reopen', [TicketController::class, 'reopen'])->name('tickets.reopen')->middleware('throttle:1,1');
-
-    // ---> TAMBAHKAN RUTE ATTACHMENT DI SINI <---
-    Route::get('/tickets/{ticket}/attachments/{attachment}', [TicketController::class, 'downloadAttachment'])->name('tickets.attachment.download');
     
     // ---> TAMBAHKAN BARIS INI DI SINI <---
     Route::post('/tickets/{ticket}/rate-and-close', [TicketController::class, 'rateAndClose'])->name('tickets.rateAndClose');

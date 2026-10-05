@@ -6,6 +6,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Mail\Mailables\Attachment; // <--- Tambahkan import ini
 
 class TicketReassignNotification extends Notification implements ShouldQueue
 {
@@ -45,7 +46,8 @@ class TicketReassignNotification extends Notification implements ShouldQueue
 
     public function toMail($notifiable)
     {
-        $logoUrl = asset('storage/companies/OZhBiZbGGW5cbErTTOVLpXHflaJcfZsM8ycrj1Ev.jpg');
+        // Menggunakan icon publik yang valid di folder public
+        $logoUrl = asset('icon-512.png');
 
         return (new MailMessage)
                     ->subject('[Amarin ITSM] Alert: Request ReAssign Tiket #' . $this->ticket->ticket_number)
@@ -59,6 +61,18 @@ class TicketReassignNotification extends Notification implements ShouldQueue
                     ->action('Lihat & ReAssign Tiket', route('tickets.show', $this->ticket->id))
                     ->line('Mohon segera ditindaklanjuti.')
                     ->salutation("Regards,\nAmarin Ship Management — IT Department");
+    }
+
+    public function attachments(): array
+    {
+        $mailAttachments = [];
+        if ($this->ticket->relationLoaded('attachments') || method_exists($this->ticket, 'attachments')) {
+            foreach ($this->ticket->attachments as $file) {
+                $mailAttachments[] = Attachment::fromStorageDisk('public', $file->file_path)
+                                               ->as($file->file_name);
+            }
+        }
+        return $mailAttachments;
     }
 
     public function toWhatsApp($notifiable)

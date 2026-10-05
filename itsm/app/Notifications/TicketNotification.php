@@ -7,6 +7,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Mail\Mailables\Attachment;
 
 class TicketNotification extends Notification implements ShouldQueue
 {
@@ -36,7 +37,8 @@ class TicketNotification extends Notification implements ShouldQueue
         $isRequester = ($notifiable->id === $this->ticket->requester_id);
         $isAdmin = ($notifiable->role === 'admin');
         
-        $logoUrl = asset('storage/companies/OZhBiZbGGW5cbErTTOVLpXHflaJcfZsM8ycrj1Ev.jpg');
+        // Menggunakan icon publik yang valid di folder public
+        $logoUrl = asset('icon-512.png');
 
         $mail = (new MailMessage)
             ->subject($this->getSubject($isRequester))
@@ -184,6 +186,20 @@ class TicketNotification extends Notification implements ShouldQueue
         }
 
         return $mail->salutation("Regards,\nAmarin Ship Management — IT Department");
+    }
+
+    public function attachments(): array
+    {
+        $mailAttachments = [];
+        
+        if ($this->ticket->relationLoaded('attachments') || method_exists($this->ticket, 'attachments')) {
+            foreach ($this->ticket->attachments as $file) {
+                $mailAttachments[] = Attachment::fromStorageDisk('public', $file->file_path)
+                                               ->as($file->file_name);
+            }
+        }
+
+        return $mailAttachments;
     }
 
     public function toArray($notifiable): array

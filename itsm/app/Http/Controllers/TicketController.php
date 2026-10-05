@@ -262,32 +262,34 @@ class TicketController extends Controller
         return redirect()->route('tickets.show', $ticket)->with('success', 'Ticket created successfully.');
     }
 
-    public function downloadAttachment(Ticket $ticket, Attachment $attachment)
-    {
-        $user = Auth::user();
-
-        // 1. Otorisasi (Mencegah IDOR)
-        $isRequester = $ticket->requester_id === $user->id;
-        $isAssignedTechnician = $ticket->assigned_to === $user->id;
-        $isAdmin = $user->role === 'admin';
-
-        if (!$isRequester && (!$isAssignedTechnician || $user->role !== 'technician') && !$isAdmin) {
-            abort(403, 'Anda tidak memiliki akses ke berkas lampiran ini.');
-        }
-
-        // 2. Pastikan attachment ini benar-benar milik tiket yang diminta di URL
-        if ($attachment->ticket_id !== $ticket->id) {
-            abort(404, 'File lampiran tidak valid untuk tiket ini.');
-        }
-
-        // 3. Cek eksistensi file fisik di server (Disk 'local')
-        if (!Storage::disk('local')->exists($attachment->path)) {
-            abort(404, 'File fisik lampiran tidak ditemukan di server.');
-        }
-
-        // 4. Download file menggunakan nama asli saat diupload
-        return Storage::disk('local')->download($attachment->path, $attachment->original_name);
+    public function downloadAttachment($ticketId, $attachmentId)
+{
+    // Menggunakan ID langsung dari parameter URL
+    $ticket = \App\Models\Ticket::find($ticketId);
+    if (! $ticket) {
+        abort(404, 'Tiket tidak ditemukan.');
     }
+
+    $attachment = \App\Models\Attachment::where('id', $attachmentId)
+                    ->where('ticket_id', $ticket->id)
+                    ->first();
+
+    if (! $attachment) {
+        abort(404, 'Berkas lampiran tidak ditemukan.');
+    }
+
+    $path = $attachment->path;
+    $disk = \Illuminate\Support\Facades\Storage::disk('local')->exists($path) ? 'local' : 'public';
+
+    if (! \Illuminate\Support\Facades\Storage::disk($disk)->exists($path)) {
+        $path = str_replace('storage/', '', $path);
+        if (! \Illuminate\Support\Facades\Storage::disk($disk)->exists($path)) {
+            abort(404, 'File fisik lampiran kosong atau tidak ada di server.');
+        }
+    }
+
+    return \Illuminate\Support\Facades\Storage::disk($disk)->download($path, $attachment->original_name);
+}
 
     public function show(Ticket $ticket)
     {

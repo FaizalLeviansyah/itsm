@@ -59,11 +59,35 @@
                 <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Attachments ({{ $ticket->attachments->count() }})</p>
                 <div class="space-y-2">
                     @foreach($ticket->attachments as $att)
-                    <a href="{{ route('tickets.attachment.download', ['ticketId' => $ticket->id, 'attachmentId' => $att->id]) }}" class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
-                        <div class="w-8 h-8 bg-white border rounded flex items-center justify-center"><i class="fas fa-file text-gray-400 text-xs"></i></div>
-                        <span class="text-sm text-gray-700 flex-1">{{ $att->original_name }}</span>
-                        <i class="fas fa-download text-gray-400 text-xs"></i>
-                    </a>
+                        @php
+                            $ext = pathinfo($att->path, PATHINFO_EXTENSION);
+                            $viewUrl = route('tickets.attachment.download', ['ticketId' => $ticket->id, 'attachmentId' => $att->id, 'mode' => 'view']);
+                            $downloadUrl = route('tickets.attachment.download', ['ticketId' => $ticket->id, 'attachmentId' => $att->id]);
+                            $isImg = in_array(strtolower($ext), ['jpg', 'jpeg', 'png', 'gif', 'webp']);
+                            $isVideo = in_array(strtolower($ext), ['mp4', 'webm', 'mov']);
+                        @endphp
+
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                            <!-- Klik area teks/ikon untuk membuka Preview Modal -->
+                            <div onclick="openPreviewModal('{{ $viewUrl }}', '{{ $downloadUrl }}', '{{ addslashes($att->original_name) }}', '{{ $ext }}')" 
+                                class="flex items-center gap-3 flex-1 cursor-pointer pr-4">
+                                <div class="w-8 h-8 bg-white border rounded flex items-center justify-center shrink-0">
+                                    @if($isImg)
+                                        <i class="fas fa-image text-blue-500 text-xs"></i>
+                                    @elseif($isVideo)
+                                        <i class="fas fa-video text-purple-500 text-xs"></i>
+                                    @else
+                                        <i class="fas fa-file text-gray-400 text-xs"></i>
+                                    @endif
+                                </div>
+                                <span class="text-sm text-gray-700 flex-1 truncate" title="{{ $att->original_name }}">{{ $att->original_name }}</span>
+                            </div>
+
+                            <!-- Tombol khusus untuk Download Fisik File -->
+                            <a href="{{ $downloadUrl }}" class="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-200 rounded transition" title="Unduh File">
+                                <i class="fas fa-download text-xs"></i>
+                            </a>
+                        </div>
                     @endforeach
                 </div>
             </div>

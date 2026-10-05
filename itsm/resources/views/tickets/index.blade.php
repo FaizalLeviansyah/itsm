@@ -99,7 +99,6 @@
     <div class="overflow-x-auto">
         <table class="w-full">
             <thead>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
                 <tr class="border-b border-gray-100 bg-gray-50/50">
                     @can('manageTickets')
                     <th class="px-3 py-3 w-10">
@@ -108,14 +107,13 @@
                     @endcan
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">ID</th>
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Subject</th>
-                    
-                    <!-- BAGIAN YANG DITAMBAHKAN: Header Kolom Proof -->
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Proof</th>
-                    
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Priority</th>
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Status</th>
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Category</th>
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Requester</th>
+                    <!-- Pindahkan Company ke dalam <tr> di sini -->
+                    <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Company</th>
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Technician</th>
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Date</th>
                 </tr>
@@ -137,21 +135,43 @@
                     </td>
 
                     <!-- BAGIAN YANG DITAMBAHKAN: Data Kolom Proof (Menampilkan Preview Gambar/File) -->
+                    <!-- BAGIAN KOLOM PROOF (PREVIEW POPUP GAMBAR & VIDEO) -->
                     <td class="px-6 py-4">
                         @if($ticket->attachments && $ticket->attachments->count() > 0)
                             <div class="flex gap-1">
                                 @foreach($ticket->attachments->take(2) as $att)
-                                    @if(Str::endsWith(strtolower($att->path), ['.jpg', '.jpeg', '.png']))
-                                        <a href="{{ route('tickets.attachment.download', ['ticketId' => $ticket->id, 'attachmentId' => $att->id]) }}" target="_blank" onclick="event.stopPropagation()" class="block">
-                                            <img src="{{ route('tickets.attachment.download', ['ticketId' => $ticket->id, 'attachmentId' => $att->id, 'mode' => 'view']) }}" class="w-9 h-9 object-cover rounded border border-gray-200 hover:scale-125 transition-transform" title="{{ $att->original_name }}">
-                                        </a>
+                                    @php
+                                        $ext = pathinfo($att->path, PATHINFO_EXTENSION);
+                                        $viewUrl = route('tickets.attachment.download', ['ticketId' => $ticket->id, 'attachmentId' => $att->id, 'mode' => 'view']);
+                                        $downloadUrl = route('tickets.attachment.download', ['ticketId' => $ticket->id, 'attachmentId' => $att->id]);
+                                        $isImg = in_array(strtolower($ext), ['jpg', 'jpeg', 'png', 'gif', 'webp']);
+                                        $isVideo = in_array(strtolower($ext), ['mp4', 'webm', 'mov']);
+                                    @endphp
+
+                                    @if($isImg)
+                                        <button type="button" 
+                                                onclick="event.stopPropagation(); openPreviewModal('{{ $viewUrl }}', '{{ $downloadUrl }}', '{{ addslashes($att->original_name) }}', '{{ $ext }}')" 
+                                                class="block focus:outline-none" 
+                                                title="Preview {{ $att->original_name }}">
+                                            <img src="{{ $viewUrl }}" class="w-9 h-9 object-cover rounded border border-gray-200 hover:scale-110 transition-transform">
+                                        </button>
+                                    @elseif($isVideo)
+                                        <button type="button" 
+                                                onclick="event.stopPropagation(); openPreviewModal('{{ $viewUrl }}', '{{ $downloadUrl }}', '{{ addslashes($att->original_name) }}', '{{ $ext }}')" 
+                                                class="w-9 h-9 bg-gray-900 border border-gray-200 rounded flex items-center justify-center hover:bg-black text-white transition focus:outline-none" 
+                                                title="Play {{ $att->original_name }}">
+                                            <i class="fas fa-play text-xs"></i>
+                                        </button>
                                     @else
-                                        <a href="{{ route('tickets.attachment.download', ['ticketId' => $ticket->id, 'attachmentId' => $att->id]) }}" target="_blank" onclick="event.stopPropagation()" class="w-9 h-9 bg-gray-50 border border-gray-200 rounded flex items-center justify-center hover:bg-gray-100 transition" title="{{ $att->original_name }}">
+                                        <button type="button" 
+                                                onclick="event.stopPropagation(); openPreviewModal('{{ $viewUrl }}', '{{ $downloadUrl }}', '{{ addslashes($att->original_name) }}', '{{ $ext }}')" 
+                                                class="w-9 h-9 bg-gray-50 border border-gray-200 rounded flex items-center justify-center hover:bg-gray-100 transition focus:outline-none" 
+                                                title="{{ $att->original_name }}">
                                             <i class="fas fa-paperclip text-gray-400 text-xs"></i>
-                                        </a>
+                                        </button>
                                     @endif
                                 @endforeach
-                                
+
                                 @if($ticket->attachments->count() > 2)
                                     <span class="text-[10px] text-gray-500 self-center ml-1">+{{ $ticket->attachments->count() - 2 }}</span>
                                 @endif
@@ -214,7 +234,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="9" class="px-6 py-16 text-center">
+                    <td colspan="11" class="px-6 py-16 text-center">
                         <i class="fas fa-inbox text-4xl text-gray-200 mb-3"></i>
                         <p class="text-gray-500 font-medium">No tickets found</p>
                         <p class="text-sm text-gray-400 mt-1">Create a new ticket to get IT support</p>

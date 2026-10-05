@@ -389,6 +389,30 @@
         </div>
     </div>
 
+    <!-- ========================================== -->
+    <!-- PREVIEW MODAL CONTAINER (TAMBAHKAN DI SINI) -->
+    <!-- ========================================== -->
+    <div id="previewModal" class="fixed inset-0 z-[100] hidden flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm transition-opacity">
+        <div class="relative bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
+                <h3 id="previewModalTitle" class="text-sm font-semibold text-gray-800 truncate">Preview File</h3>
+                <div class="flex items-center gap-2">
+                    <a id="previewDownloadBtn" href="#" class="p-1.5 text-gray-500 hover:text-blue-600 rounded-lg hover:bg-gray-200 transition" title="Unduh File">
+                        <i class="fas fa-download text-sm"></i>
+                    </a>
+                    <button type="button" onclick="closePreviewModal()" class="p-1.5 text-gray-500 hover:text-red-600 rounded-lg hover:bg-gray-200 transition">
+                        <i class="fas fa-times text-base"></i>
+                    </button>
+                </div>
+            </div>
+            <!-- Modal Body -->
+            <div id="previewModalBody" class="p-4 flex items-center justify-center min-h-[300px] max-h-[75vh] overflow-auto bg-gray-900/5">
+                <!-- Konten Pratinjau (Gambar / Video / Fallback) dirender via JS -->
+            </div>
+        </div>
+    </div>
+
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <style>
@@ -529,6 +553,57 @@
             });
         }
     </script>
+
+    <script>
+    function openPreviewModal(viewUrl, downloadUrl, fileName, ext) {
+        const modal = document.getElementById('previewModal');
+        const title = document.getElementById('previewModalTitle');
+        const downloadBtn = document.getElementById('previewDownloadBtn');
+        const body = document.getElementById('previewModalBody');
+
+        title.textContent = fileName;
+        downloadBtn.href = downloadUrl;
+        
+        ext = ext.toLowerCase();
+        const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
+        const videoExts = ['mp4', 'webm', 'ogg', 'mov'];
+
+        body.innerHTML = '';
+
+        if (imageExts.includes(ext)) {
+            body.innerHTML = `<img src="${viewUrl}" class="max-w-full max-h-[70vh] object-contain rounded shadow" alt="${fileName}">`;
+        } else if (videoExts.includes(ext)) {
+            body.innerHTML = `<video src="${viewUrl}" controls autoplay class="max-w-full max-h-[70vh] rounded shadow"></video>`;
+        } else {
+            body.innerHTML = `
+                <div class="text-center py-8">
+                    <i class="fas fa-file-alt text-5xl text-gray-400 mb-3 block"></i>
+                    <p class="text-sm text-gray-600 mb-4">Pratinjau tidak tersedia untuk format file ini.</p>
+                    <a href="${downloadUrl}" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition">
+                        <i class="fas fa-download"></i> Unduh File
+                    </a>
+                </div>`;
+        }
+
+        modal.classList.remove('hidden');
+    }
+
+    function closePreviewModal() {
+        const modal = document.getElementById('previewModal');
+        const body = document.getElementById('previewModalBody');
+        modal.classList.add('hidden');
+        body.innerHTML = ''; // Hentikan video saat modal ditutup
+    }
+
+    // Tutup modal saat menekan tombol ESC
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closePreviewModal();
+    });
+    </script>
+    <!-- ========================================== -->
+    <!-- AKHIR PREVIEW MODAL CONTAINER -->
+    <!-- ========================================== -->
+
     @stack('scripts')
 </body>
 </html>

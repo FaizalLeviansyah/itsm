@@ -44,6 +44,50 @@
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <!-- Main Content -->
     <div class="lg:col-span-2 space-y-6">
+        <!-- START TAMBAHAN: BANNER & ACTION APPROVAL ADMIN / ATASAN -->
+        @if($ticket->status === 'pending' && $ticket->approvals->where('status', 'pending')->count() > 0)
+            <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-5 mb-6 shadow-sm">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex items-start gap-3">
+                        <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center shrink-0">
+                            <i class="fas fa-exclamation-triangle text-amber-600 text-lg"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold text-amber-900">Tiket Menunggu Approval</h3>
+                            <p class="text-xs text-amber-800 mt-0.5">
+                                Tiket ini dibuat oleh <strong>{{ $ticket->histories->first()?->user->name ?? 'Admin/Teknisi' }}</strong> 
+                                atas nama <strong>{{ $ticket->requester->name }}</strong>. Membutuhkan verifikasi Admin/Atasan agar dapat dijalankan.
+                            </p>
+                        </div>
+                    </div>
+
+                    @if(auth()->user()->role === 'admin')
+                        <div class="flex items-center gap-2 shrink-0">
+                            <!-- Form Reject -->
+                            <form action="{{ route('tickets.status', $ticket) }}" method="POST" onsubmit="return confirm('Tolak tiket ini?')">
+                                @csrf
+                                <input type="hidden" name="status" value="cancelled">
+                                <input type="hidden" name="resolution_notes" value="Ditolak oleh Admin/Atasan saat tahapan Approval On Behalf.">
+                                <button type="submit" class="px-3.5 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-xs font-semibold transition flex items-center gap-1.5">
+                                    <i class="fas fa-times"></i> Tolak
+                                </button>
+                            </form>
+
+                            <!-- Form Approve -->
+                            <form action="{{ route('tickets.status', $ticket) }}" method="POST">
+                                @csrf
+                                <input type="hidden" name="status" value="open">
+                                <input type="hidden" name="resolution_notes" value="Disetujui oleh Admin/Atasan (Approved On Behalf).">
+                                <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition shadow flex items-center gap-1.5">
+                                    <i class="fas fa-check"></i> Approve & Process
+                                </button>
+                            </form>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        @endif
+        <!-- END TAMBAHAN: BANNER & ACTION APPROVAL -->
         <!-- Description -->
         <div class="bg-white rounded-xl border border-gray-100 p-6">
             <div class="flex items-center gap-2 mb-4">

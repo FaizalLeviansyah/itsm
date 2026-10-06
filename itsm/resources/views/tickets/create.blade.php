@@ -20,6 +20,27 @@
         <!-- Main Form (Left 2/3) -->
         <div class="lg:col-span-2 space-y-6">
             <div class="bg-white rounded-xl border border-gray-100 p-6 space-y-6">
+                <!-- BAGIAN YANG DITAMBAHKAN: On Behalf Of (Khusus Admin/Teknisi) -->
+                    <!-- START TAMBAHAN: DROPDOWN ON BEHALF OF (KHUSUS ADMIN & TECHNICIAN) -->
+                    @if(in_array(auth()->user()->role, ['admin', 'technician']))
+                    <div class="p-4 bg-amber-50/60 border border-amber-200 rounded-lg">
+                        <label class="block text-xs font-semibold text-amber-800 uppercase tracking-wide mb-2">
+                            <i class="fas fa-user-friends mr-1"></i> Request On Behalf Of (Opsional)
+                        </label>
+                        <select name="requester_id" class="w-full border border-amber-300 rounded-lg px-4 py-2.5 text-sm bg-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500">
+                            <option value="">-- Buat Tiket Untuk Diri Sendiri ({{ auth()->user()->name }}) --</option>
+                            @foreach(\App\Models\User::where('id', '!=', auth()->id())->where('is_active', true)->orderBy('name')->get() as $u)
+                                <option value="{{ $u->id }}" {{ old('requester_id') == $u->id ? 'selected' : '' }}>
+                                    {{ $u->name }} ({{ $u->company->name ?? 'No Company' }} - {{ ucfirst($u->role) }})
+                                </option>
+                            @endforeach
+                        </select>
+                        <p class="text-[11px] text-amber-700 mt-1">
+                            *Jika memilih pengguna lain, tiket ini akan memerlukan <strong>Approval Admin/Atasan</strong> sebelum diproses.
+                        </p>
+                    </div>
+                    @endif
+                    <!-- END TAMBAHAN: DROPDOWN ON BEHALF OF -->
                 <!-- Subject -->
                 <div>
                     <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Subject *</label>

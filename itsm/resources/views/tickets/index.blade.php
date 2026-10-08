@@ -208,14 +208,19 @@
                         </div>
                     </td>
                     <td class="px-6 py-4">
+                        @php
+                            // Mengambil data perusahaan dari relasi ticket->company atau dari requester->company
+                            $companyObj = $ticket->company ?? ($ticket->requester->company ?? null);
+                            $companyName = is_object($companyObj) ? ($companyObj->name ?? '-') : ($companyObj ?? '-');
+                        @endphp
                         <div class="flex items-center gap-2">
                             <div class="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center">
                                 <span class="text-[9px] font-bold text-gray-600">
-                                    {{ $ticket->company ? strtoupper(substr($ticket->company->name, 0, 2)) : '-' }}
+                                    {{ $companyName !== '-' ? strtoupper(substr($companyName, 0, 2)) : '-' }}
                                 </span>
                             </div>
                             <span class="text-sm text-gray-700">
-                                {{ $ticket->company ? Str::limit($ticket->company->name, 15) : '-' }}
+                                {{ Str::limit($companyName, 15) }}
                             </span>
                         </div>
                     </td>

@@ -90,7 +90,7 @@ class TicketController extends Controller
     public function index(Request $request)
     {
         $query = Ticket::with([
-        'requester', 
+        'requester.company',
         'assignee', 
         'priority', 
         'category', 

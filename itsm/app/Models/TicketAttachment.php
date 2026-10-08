@@ -7,7 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TicketAttachment extends Model
 {
-    protected $fillable = ['ticket_id', 'user_id', 'filename', 'original_name', 'mime_type', 'size', 'path'];
+    // Tambahkan 'ticket_comment_id' di sini
+    protected $fillable = ['ticket_id', 'ticket_comment_id', 'user_id', 'filename', 'original_name', 'mime_type', 'size', 'path'];
 
     public function ticket(): BelongsTo
     {
@@ -18,4 +19,9 @@ class TicketAttachment extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    public function comment(): BelongsTo
+{
+    return $this->belongsTo(TicketComment::class, 'ticket_comment_id');
+}
 }

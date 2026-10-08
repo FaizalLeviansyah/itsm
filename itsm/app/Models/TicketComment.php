@@ -20,4 +20,14 @@ class TicketComment extends Model
     {
         return $this->belongsTo(User::class)->withTrashed();
     }
+
+        public function comments()
+    {
+        return $this->hasMany(TicketComment::class);
+    }
+
+        public function attachments()
+    {
+        return $this->hasMany(TicketAttachment::class, 'ticket_comment_id');
+    }
 }

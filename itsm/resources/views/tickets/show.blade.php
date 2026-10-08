@@ -236,17 +236,56 @@
                 @foreach($ticket->comments as $comment)
                 <div class="flex gap-3">
                     <div class="w-8 h-8 {{ $comment->is_internal ? 'bg-amber-100' : 'bg-gray-100' }} rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <!-- Amankan inisial avatar comment -->
                         <span class="text-[10px] font-bold {{ $comment->is_internal ? 'text-amber-700' : 'text-gray-600' }}">{{ strtoupper(substr($comment->user?->name ?? 'NA', 0, 2)) }}</span>
                     </div>
                     <div class="flex-1 {{ $comment->is_internal ? 'bg-amber-50 border-amber-100' : 'bg-gray-50 border-gray-100' }} border rounded-lg p-3">
                         <div class="flex items-center gap-2 mb-1">
-                            <!-- Amankan nama komentator -->
                             <span class="text-sm font-medium text-gray-800">{{ $comment->user?->name ?? 'User Non-Aktif' }}</span>
                             @if($comment->is_internal)<span class="text-[10px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-medium">Internal</span>@endif
                             <span class="text-xs text-gray-400">{{ $comment->created_at->diffForHumans() }}</span>
                         </div>
-                        <p class="text-sm text-gray-700">{{ $comment->comment }}</p>
+                        
+                        {{-- Isi Komentar --}}
+                        <p class="text-sm text-gray-700 whitespace-pre-wrap mb-2">{{ $comment->comment }}</p>
+
+                        {{-- Preview Lampiran (Attachment) Milik Komentar Ini --}}
+                        @if($comment->attachments && $comment->attachments->count() > 0)
+                        <div class="mt-2 pt-2 border-t border-gray-200/60 flex flex-wrap gap-2">
+                            @foreach($comment->attachments as $att)
+                                @php
+                                    $ext = strtolower(pathinfo($att->path, PATHINFO_EXTENSION));
+                                    $viewUrl = route('tickets.attachment.download', ['ticketId' => $ticket->id, 'attachmentId' => $att->id, 'mode' => 'view']);
+                                    $downloadUrl = route('tickets.attachment.download', ['ticketId' => $ticket->id, 'attachmentId' => $att->id]);
+                                    $isImg = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp']);
+                                    $isVideo = in_array($ext, ['mp4', 'mov', 'avi', 'mkv']);
+                                @endphp
+
+                                <div class="relative group bg-white border border-gray-200 rounded-md p-1.5 flex items-center gap-2 shadow-sm">
+                                    @if($isImg)
+                                        <a href="{{ $viewUrl }}" target="_blank" class="block w-10 h-10 overflow-hidden rounded flex-shrink-0">
+                                            <img src="{{ $viewUrl }}" class="w-full h-full object-cover">
+                                        </a>
+                                    @elseif($isVideo)
+                                        <div class="w-10 h-10 bg-purple-50 rounded flex items-center justify-center text-purple-600 flex-shrink-0">
+                                            <i class="fas fa-video text-xs"></i>
+                                        </div>
+                                    @else
+                                        <div class="w-10 h-10 bg-gray-50 rounded flex items-center justify-center text-gray-500 flex-shrink-0">
+                                            <i class="fas fa-file-archive text-xs"></i>
+                                        </div>
+                                    @endif
+                                    
+                                    <div class="text-xs pr-1">
+                                        <a href="{{ $downloadUrl }}" class="font-medium text-gray-700 hover:text-blue-600 truncate max-w-[130px] block" title="{{ $att->original_name }}">
+                                            {{ $att->original_name }}
+                                        </a>
+                                        <span class="text-[10px] uppercase text-gray-400">(.{{ $ext }})</span>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                        @endif
+
                     </div>
                 </div>
                 @endforeach
@@ -254,7 +293,8 @@
 
             <!-- Add Comment -->
             @if(!in_array($ticket->status, ['closed', 'cancelled']))
-            <form action="{{ route('tickets.comment', $ticket) }}" method="POST" class="border-t border-gray-100 pt-5">
+            <!-- TAMBAHKAN enctype="multipart/form-data" -->
+            <form action="{{ route('tickets.comment', $ticket) }}" method="POST" class="border-t border-gray-100 pt-5" enctype="multipart/form-data">
                 @csrf
                 @can('manageTickets')
                 @if(isset($cannedResponses) && $cannedResponses->count() > 0)
@@ -272,6 +312,26 @@
                     </div>
                     <div class="flex-1">
                         <textarea name="comment" id="comment-box" rows="3" required class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500" placeholder="Write a note or reply..."></textarea>
+                        
+                        <!-- AREA UPLOAD ATTACHMENT KOMENTAR -->
+                        <div class="mt-3">
+                            <div class="border-2 border-dashed border-gray-200 rounded-lg p-4 text-center hover:border-brand-400 transition cursor-pointer relative group bg-gray-50/50">
+                                <div class="flex flex-col items-center justify-center pointer-events-none gap-1">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-paperclip text-gray-400 group-hover:text-brand-500 transition"></i>
+                                        <p class="text-xs text-gray-600 font-medium">Click or drag files here to attach</p>
+                                    </div>
+                                    <p class="text-[10px] text-gray-400 font-medium">Mendukung semua format file (ZIP, RAR, Foto, Video, Dokumen)</p>
+                                </div>
+                                <!-- Hapus atribut accept agar semua ekstensi diizinkan -->
+                               <input type="file" id="comment-file-upload" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.tar,.7z,.mp4,.mov,.avi,.mkv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="previewCommentFiles()">
+                                <p class="text-xs text-gray-600 font-medium">Click or drag files here to attach (ZIP, RAR, Foto, Video, Dokumen)</p>
+                            </div>
+                            <!-- Container Preview File sebelum dikirim -->
+                            <div id="comment-file-preview-container" class="mt-3 flex flex-wrap gap-2 hidden"></div>
+                        </div>
+                        <!-- AKHIR AREA UPLOAD -->
+
                         <div class="flex items-center justify-between mt-3">
                             @can('manageTickets')
                             <label class="flex items-center gap-2 text-sm text-gray-500">
@@ -544,6 +604,66 @@
 @endsection
 
 @push('scripts')
+<script>
+// Array untuk menampung file upload balasan
+let selectedCommentFiles = [];
+
+function previewCommentFiles() {
+    const input = document.getElementById('comment-file-upload');
+    
+    Array.from(input.files).forEach(file => {
+        selectedCommentFiles.push(file);
+    });
+
+    updateCommentFileInputAndPreview();
+}
+
+function removeCommentFile(index) {
+    selectedCommentFiles.splice(index, 1);
+    updateCommentFileInputAndPreview();
+}
+
+function updateCommentFileInputAndPreview() {
+    const container = document.getElementById('comment-file-preview-container');
+    const input = document.getElementById('comment-file-upload');
+    
+    // Perbarui data transfer form
+    const dataTransfer = new DataTransfer();
+    selectedCommentFiles.forEach(file => dataTransfer.items.add(file));
+    input.files = dataTransfer.files;
+
+    // Render ulang preview UI
+    container.innerHTML = '';
+    if (selectedCommentFiles.length > 0) {
+        container.classList.remove('hidden');
+        selectedCommentFiles.forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const isImage = file.type.startsWith('image/');
+                const previewContent = isImage 
+                    ? `<img src="${e.target.result}" class="w-full h-full object-cover rounded-md">`
+                    : `<div class="w-full h-full bg-gray-100 rounded-md flex flex-col items-center justify-center p-1 text-center">
+                           <i class="fas fa-file-alt text-gray-400 text-sm mb-1"></i>
+                           <span class="text-[8px] text-gray-500 truncate w-full">${file.name}</span>
+                       </div>`;
+
+                const card = document.createElement('div');
+                card.className = 'relative w-16 h-16 group/item bg-white p-0.5 rounded-md border border-gray-200 shrink-0 shadow-sm';
+                card.innerHTML = `
+                    ${previewContent}
+                    <button type="button" onclick="removeCommentFile(${index})" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] shadow hover:bg-red-600 transition">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                container.appendChild(card);
+            }
+            reader.readAsDataURL(file);
+        });
+    } else {
+        container.classList.add('hidden');
+    }
+}
+</script>
 <script>
 function setRating(value) {
     document.getElementById('rating-value').value = value;

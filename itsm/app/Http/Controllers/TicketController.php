@@ -89,7 +89,16 @@ class TicketController extends Controller
 
     public function index(Request $request)
     {
-        $query = Ticket::with(['requester', 'assignee', 'priority', 'category', 'company']);
+        $query = Ticket::with([
+        'requester', 
+        'assignee', 
+        'priority', 
+        'category', 
+        'company',
+        'attachments' => function ($q) {
+            $q->whereNull('ticket_comment_id');
+            }
+        ]);
 
         if (Auth::user()->role === 'user') {
             $query->where('requester_id', Auth::id());
@@ -117,6 +126,7 @@ class TicketController extends Controller
                   ->orWhere('title', 'like', "%{$request->search}%");
             });
         }
+        
 
         $tickets = $query->orderByDesc('created_at')->paginate(15);
         $priorities = Priority::all();
@@ -146,8 +156,8 @@ class TicketController extends Controller
 
     public function store(Request $request)
     {
-        // 1. Validasi Input Form
-        $request->validate([
+        // 1. Validasi Input Form (TAMPUNG KE $validatedData)
+        $validatedData = $request->validate([
             'requester_id' => 'nullable|exists:users,id', // Validasi On Behalf Of
             'title' => 'required|string|max:255',
             'description' => 'required|string',
@@ -167,7 +177,7 @@ class TicketController extends Controller
         ]);
 
         $priority = Priority::find($request->priority_id);
-        $ticketType = $request->request_type;
+        $ticketType = $validatedData['request_type'];
 
         // 2. Logika Penentu Requester & Deteksi On Behalf Of
         $actualRequesterId = Auth::id();
@@ -201,14 +211,14 @@ class TicketController extends Controller
         // 4. Pembuatan Data Tiket
         $ticket = Ticket::create([
             'ticket_number' => Ticket::generateTicketNumber(),
-            'title' => $request->title,
-            'description' => $request->description,
-            'category_id' => $request->category_id,
-            'sub_category_id' => $request->sub_category_id,
-            'priority_id' => $request->priority_id,
+            'title' => $validatedData['title'],
+            'description' => $validatedData['description'],
+            'category_id' => $validatedData['category_id'],
+            'sub_category_id' => $validatedData['sub_category_id'] ?? null,
+            'priority_id' => $validatedData['priority_id'],
             'requester_id' => $actualRequesterId,
             'company_id' => $actualCompanyId,
-            'type' => $ticketType,
+            'type' => $validatedData['request_type'],
             'impact' => $request->impact ?? 'low',
             'urgency' => $request->urgency ?? 'low',
             'location' => $request->location,
@@ -223,7 +233,7 @@ class TicketController extends Controller
                 'ticket_id' => $ticket->id,
                 'requested_by' => Auth::id(), // User pembuat tiket (Admin/Teknisi)
                 'justification' => $isOnBehalf ? 'Pembuatan tiket On Behalf Of membutuhkan approval Atasan/Admin.' : $request->description,
-                'approval_level' => $approvalType === 'change_request' ? 'it_head' : 'manager', // DIPERBAIKI DISINI: 'admin' menjadi 'manager' sesuai ENUM database
+                'approval_level' => $approvalType === 'change_request' ? 'it_head' : 'manager',
                 'status' => 'pending',
             ]);
         } else {
@@ -326,10 +336,10 @@ class TicketController extends Controller
         abort(404, 'Tiket tidak ditemukan.');
     }
 
-    $attachment = \App\Models\Attachment::where('id', $attachmentId)
-                    ->where('ticket_id', $ticket->id)
-                    ->first();
-
+    $attachment = \App\Models\TicketAttachment::where('id', $attachmentId)
+                ->where('ticket_id', $ticket->id)
+                ->first();
+                
     if (! $attachment) {
         abort(404, 'Berkas lampiran tidak ditemukan.');
     }
@@ -445,6 +455,19 @@ class TicketController extends Controller
         $oldStatus = $ticket->status;
         $data = ['status' => $request->status];
 
+        // --- TAMBAHKAN KODE INI UNTUK UPDATE TABEL APPROVAL ---
+        // Jika tiket sedang pending dan status diubah jadi open/cancelled via Banner Approval
+        if ($oldStatus === 'pending' && $ticket->approvals()->where('status', 'pending')->exists()) {
+            $approvalStatus = $request->status === 'cancelled' ? 'rejected' : 'approved';
+            
+            $ticket->approvals()->where('status', 'pending')->update([
+                'status' => $approvalStatus,
+                'approved_by' => Auth::id(),
+                'approved_at' => now(),
+                'notes' => $request->resolution_notes, // Catatan alasan reject/approve
+            ]);
+        }
+
         if ($request->status === 'resolved') {
             $data['resolved_at'] = now();
             $data['resolution_notes'] = $request->resolution_notes;
@@ -479,15 +502,39 @@ class TicketController extends Controller
 
     public function addComment(Request $request, Ticket $ticket)
     {
-        $request->validate(['comment' => 'required|string']);
+        $request->validate([
+            'comment' => 'required|string',
+            'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx,zip,rar,tar,7z,mp4,mov,avi,mkv|max:20480',
+        ], [
+            'attachments.*.mimes' => 'Format file lampiran tidak diizinkan. Gunakan JPG, PNG, PDF, Office, ZIP, RAR, atau Video.',
+            'attachments.*.max' => 'Ukuran setiap file lampiran maksimal 20MB.'
+        ]);
 
-        $ticket->comments()->create([
+        $comment = $ticket->comments()->create([
             'user_id' => Auth::id(),
             'comment' => $request->comment,
             'is_internal' => $request->boolean('is_internal'),
         ]);
 
-        return back()->with('success', 'Comment added successfully.');
+        // 2. Simpan lampiran jika ada
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $file) {
+                $path = $file->store('tickets/' . $ticket->id . '/comments', 'public'); // atau disk Anda
+                
+                $ticket->attachments()->create([
+                    'ticket_comment_id' => $comment->id, // <-- Terikat langsung ke komentar ini!
+                    'ticket_id' => $ticket->id,
+                    'user_id' => Auth::id(),
+                    'filename' => basename($path),
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'size' => $file->getSize(),
+                    'path' => $path, 
+                ]);
+            }
+        }
+
+        return back()->with('success', 'Comment and attachments added successfully.');
     }
 
     public function reopen(Request $request, Ticket $ticket)

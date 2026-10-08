@@ -103,6 +103,13 @@ class Ticket extends Model
         return $this->hasOne(TicketApproval::class);
     }
 
+        // app/Models/Ticket.php
+
+    public function approvals()
+    {
+        return $this->hasMany(TicketApproval::class, 'ticket_id');
+    }
+
     public function escalations(): HasMany
     {
         return $this->hasMany(TicketEscalation::class)->orderByDesc('created_at');

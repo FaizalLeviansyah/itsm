@@ -145,178 +145,178 @@ class TicketController extends Controller
     }
 
     public function store(Request $request)
-{
-    // 1. Validasi Input Form
-    $request->validate([
-        'requester_id' => 'nullable|exists:users,id', // Validasi On Behalf Of
-        'title' => 'required|string|max:255',
-        'description' => 'required|string',
-        'category_id' => 'required|exists:categories,id',
-        'sub_category_id' => 'nullable|exists:sub_categories,id',
-        'priority_id' => 'required|exists:priorities,id',
-        'request_type' => 'required|in:incident,service_request,problem,change_request', 
-        'impact' => 'nullable|string',
-        'urgency' => 'nullable|string',
-        'location' => 'nullable|string|max:255',
-        'vessel_name' => 'nullable|string|max:255',
-        'asset_id' => 'nullable|exists:assets,id',
-        'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx,mp4,mov,avi|max:20480', 
-    ], [
-        'attachments.*.mimes' => 'Format file lampiran tidak diizinkan. Gunakan JPG, PNG, PDF, Office, atau Video (MP4/AVI).',
-        'attachments.*.max' => 'Ukuran setiap file lampiran maksimal 20MB.'
-    ]);
-
-    $priority = Priority::find($request->priority_id);
-    $ticketType = $request->request_type;
-
-    // 2. Logika Penentu Requester & Deteksi On Behalf Of
-    $actualRequesterId = Auth::id();
-    $actualCompanyId = Auth::user()->company_id;
-    $isOnBehalf = false;
-
-    if (in_array(Auth::user()->role, ['admin', 'technician']) && $request->filled('requester_id') && $request->requester_id != Auth::id()) {
-        $actualRequesterId = $request->requester_id;
-        $requestedUser = \App\Models\User::find($request->requester_id);
-        if ($requestedUser) {
-            $actualCompanyId = $requestedUser->company_id;
-        }
-        $isOnBehalf = true;
-    }
-
-    // 3. Penentuan Status Awal & Kebutuhan Approval
-    $initialStatus = 'open';
-    $needsApproval = false;
-    $approvalType = null;
-
-    if ($ticketType === 'change_request') {
-        $initialStatus = 'pending';
-        $needsApproval = true;
-        $approvalType = 'change_request';
-    } elseif ($isOnBehalf) {
-        $initialStatus = 'pending';
-        $needsApproval = true;
-        $approvalType = 'on_behalf';
-    }
-
-    // 4. Pembuatan Data Tiket
-    $ticket = Ticket::create([
-        'ticket_number' => Ticket::generateTicketNumber(),
-        'title' => $request->title,
-        'description' => $request->description,
-        'category_id' => $request->category_id,
-        'sub_category_id' => $request->sub_category_id,
-        'priority_id' => $request->priority_id,
-        'requester_id' => $actualRequesterId,
-        'company_id' => $actualCompanyId,
-        'type' => $ticketType,
-        'impact' => $request->impact ?? 'low',
-        'urgency' => $request->urgency ?? 'low',
-        'location' => $request->location,
-        'vessel_name' => $request->vessel_name,
-        'status' => $initialStatus,
-        'due_date' => $this->slaCalculator->calculateDueDate(now(), $priority->sla_hours ?? 24),
-    ]);
-
-    // 5. Handling Approval atau Auto-Assign Rule
-    if ($needsApproval) {
-        TicketApproval::create([
-            'ticket_id' => $ticket->id,
-            'requested_by' => Auth::id(), // User pembuat tiket (Admin/Teknisi)
-            'justification' => $isOnBehalf ? 'Pembuatan tiket On Behalf Of membutuhkan approval Atasan/Admin.' : $request->description,
-            'approval_level' => $approvalType === 'change_request' ? 'it_head' : 'admin_approval',
-            'status' => 'pending',
+    {
+        // 1. Validasi Input Form
+        $request->validate([
+            'requester_id' => 'nullable|exists:users,id', // Validasi On Behalf Of
+            'title' => 'required|string|max:255',
+            'description' => 'required|string',
+            'category_id' => 'required|exists:categories,id',
+            'sub_category_id' => 'nullable|exists:sub_categories,id',
+            'priority_id' => 'required|exists:priorities,id',
+            'request_type' => 'required|in:incident,service_request,problem,change_request', 
+            'impact' => 'nullable|string',
+            'urgency' => 'nullable|string',
+            'location' => 'nullable|string|max:255',
+            'vessel_name' => 'nullable|string|max:255',
+            'asset_id' => 'nullable|exists:assets,id',
+            'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx,mp4,mov,avi|max:20480', 
+        ], [
+            'attachments.*.mimes' => 'Format file lampiran tidak diizinkan. Gunakan JPG, PNG, PDF, Office, atau Video (MP4/AVI).',
+            'attachments.*.max' => 'Ukuran setiap file lampiran maksimal 20MB.'
         ]);
-    } else {
-        $autoAssignee = \App\Models\AutoAssignRule::findAssignee(
-            $request->category_id,
-            $request->sub_category_id,
-            $actualCompanyId,
-            $request->vessel_name,
-            Auth::user()->source
-        );
-        
-        if ($autoAssignee) {
-            $ticket->update([
-                'assigned_to' => $autoAssignee,
-                'assigned_at' => now(),
-                'status' => 'assigned',
-            ]);
-            TicketHistory::create([
+
+        $priority = Priority::find($request->priority_id);
+        $ticketType = $request->request_type;
+
+        // 2. Logika Penentu Requester & Deteksi On Behalf Of
+        $actualRequesterId = Auth::id();
+        $actualCompanyId = Auth::user()->company_id;
+        $isOnBehalf = false;
+
+        if (in_array(Auth::user()->role, ['admin', 'technician']) && $request->filled('requester_id') && $request->requester_id != Auth::id()) {
+            $actualRequesterId = $request->requester_id;
+            $requestedUser = \App\Models\User::find($request->requester_id);
+            if ($requestedUser) {
+                $actualCompanyId = $requestedUser->company_id;
+            }
+            $isOnBehalf = true;
+        }
+
+        // 3. Penentuan Status Awal & Kebutuhan Approval
+        $initialStatus = 'open';
+        $needsApproval = false;
+        $approvalType = null;
+
+        if ($ticketType === 'change_request') {
+            $initialStatus = 'pending';
+            $needsApproval = true;
+            $approvalType = 'change_request';
+        } elseif ($isOnBehalf) {
+            $initialStatus = 'pending';
+            $needsApproval = true;
+            $approvalType = 'on_behalf';
+        }
+
+        // 4. Pembuatan Data Tiket
+        $ticket = Ticket::create([
+            'ticket_number' => Ticket::generateTicketNumber(),
+            'title' => $request->title,
+            'description' => $request->description,
+            'category_id' => $request->category_id,
+            'sub_category_id' => $request->sub_category_id,
+            'priority_id' => $request->priority_id,
+            'requester_id' => $actualRequesterId,
+            'company_id' => $actualCompanyId,
+            'type' => $ticketType,
+            'impact' => $request->impact ?? 'low',
+            'urgency' => $request->urgency ?? 'low',
+            'location' => $request->location,
+            'vessel_name' => $request->vessel_name,
+            'status' => $initialStatus,
+            'due_date' => $this->slaCalculator->calculateDueDate(now(), $priority->sla_hours ?? 24),
+        ]);
+
+        // 5. Handling Approval atau Auto-Assign Rule
+        if ($needsApproval) {
+            TicketApproval::create([
                 'ticket_id' => $ticket->id,
-                'user_id' => $autoAssignee,
-                'field' => 'assigned_to',
-                'new_value' => User::find($autoAssignee)->name,
-                'note' => 'Auto-assigned based on rule',
+                'requested_by' => Auth::id(), // User pembuat tiket (Admin/Teknisi)
+                'justification' => $isOnBehalf ? 'Pembuatan tiket On Behalf Of membutuhkan approval Atasan/Admin.' : $request->description,
+                'approval_level' => $approvalType === 'change_request' ? 'it_head' : 'manager', // DIPERBAIKI DISINI: 'admin' menjadi 'manager' sesuai ENUM database
+                'status' => 'pending',
             ]);
-        }
-    }
-
-    // 6. Simpan Relasi Asset
-    if ($request->filled('asset_id')) {
-        $ticket->assets()->attach($request->asset_id);
-    }
-
-    // 7. Simpan Lampiran (Attachments)
-    if ($request->hasFile('attachments')) {
-        foreach ($request->file('attachments') as $file) {
-            $path = $file->store('tickets/' . $ticket->id, 'local'); 
+        } else {
+            $autoAssignee = \App\Models\AutoAssignRule::findAssignee(
+                $request->category_id,
+                $request->sub_category_id,
+                $actualCompanyId,
+                $request->vessel_name,
+                Auth::user()->source
+            );
             
-            $ticket->attachments()->create([
-                'user_id' => Auth::id(),
-                'filename' => basename($path),
-                'original_name' => $file->getClientOriginalName(),
-                'mime_type' => $file->getMimeType(),
-                'size' => $file->getSize(),
-                'path' => $path, 
-            ]);
+            if ($autoAssignee) {
+                $ticket->update([
+                    'assigned_to' => $autoAssignee,
+                    'assigned_at' => now(),
+                    'status' => 'assigned',
+                ]);
+                TicketHistory::create([
+                    'ticket_id' => $ticket->id,
+                    'user_id' => $autoAssignee,
+                    'field' => 'assigned_to',
+                    'new_value' => User::find($autoAssignee)->name,
+                    'note' => 'Auto-assigned based on rule',
+                ]);
+            }
         }
-    }
 
-    // 8. Catat History
-    $historyNote = 'Ticket created';
-    if ($isOnBehalf) {
-        $requesterName = User::find($actualRequesterId)?->name ?? 'User';
-        $historyNote .= " On Behalf Of {$requesterName} (Menunggu Approval Admin/Atasan)";
-    }
-
-    TicketHistory::create([
-        'ticket_id' => $ticket->id,
-        'user_id' => Auth::id(),
-        'field' => 'status',
-        'new_value' => $ticket->status,
-        'note' => $historyNote,
-    ]);
-
-    // 9. Kirim Notifikasi
-    $ticket->load(['requester', 'priority', 'category', 'company', 'attachments']);
-    
-    $extraNote = 'Kategori: ' . $ticket->category->name;
-    if ($isOnBehalf) {
-        $extraNote .= "\n\n⚠️ *MEMBUTUHKAN APPROVAL (ON BEHALF OF)* oleh Admin/Atasan.";
-    }
-    if ($ticket->attachments->count() > 0) {
-        $extraNote .= "\n\n*Lampiran:* Tersedia " . $ticket->attachments->count() . " file/video.";
-        $extraNote .= "\nAkses detail tiket: " . route('tickets.show', $ticket->id);
-    }
-
-    try {
-        $this->waService->notifyTicketCreated($ticket);
-        $this->notifyAdminViaWa($ticket, $isOnBehalf ? 'Ticket On Behalf Created (Needs Approval)' : 'Ticket Created', $extraNote);
-
-        $admins = User::where('role', 'admin')->get();
-        foreach ($admins as $admin) {
-            $admin->notify(new TicketNotification($ticket, $isOnBehalf ? 'on_behalf_approval_required' : 'created'));
+        // 6. Simpan Relasi Asset
+        if ($request->filled('asset_id')) {
+            $ticket->assets()->attach($request->asset_id);
         }
-    } catch (\Exception $e) {
-        Log::error('Notification Failed: ' . $e->getMessage());
+
+        // 7. Simpan Lampiran (Attachments)
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $file) {
+                $path = $file->store('tickets/' . $ticket->id, 'local'); 
+                
+                $ticket->attachments()->create([
+                    'user_id' => Auth::id(),
+                    'filename' => basename($path),
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'size' => $file->getSize(),
+                    'path' => $path, 
+                ]);
+            }
+        }
+
+        // 8. Catat History
+        $historyNote = 'Ticket created';
+        if ($isOnBehalf) {
+            $requesterName = User::find($actualRequesterId)?->name ?? 'User';
+            $historyNote .= " On Behalf Of {$requesterName} (Menunggu Approval Admin/Atasan)";
+        }
+
+        TicketHistory::create([
+            'ticket_id' => $ticket->id,
+            'user_id' => Auth::id(),
+            'field' => 'status',
+            'new_value' => $ticket->status,
+            'note' => $historyNote,
+        ]);
+
+        // 9. Kirim Notifikasi
+        $ticket->load(['requester', 'priority', 'category', 'company', 'attachments']);
+        
+        $extraNote = 'Kategori: ' . $ticket->category->name;
+        if ($isOnBehalf) {
+            $extraNote .= "\n\n⚠️ *MEMBUTUHKAN APPROVAL (ON BEHALF OF)* oleh Admin/Atasan.";
+        }
+        if ($ticket->attachments->count() > 0) {
+            $extraNote .= "\n\n*Lampiran:* Tersedia " . $ticket->attachments->count() . " file/video.";
+            $extraNote .= "\nAkses detail tiket: " . route('tickets.show', $ticket->id);
+        }
+
+        try {
+            $this->waService->notifyTicketCreated($ticket);
+            $this->notifyAdminViaWa($ticket, $isOnBehalf ? 'Ticket On Behalf Created (Needs Approval)' : 'Ticket Created', $extraNote);
+
+            $admins = User::where('role', 'admin')->get();
+            foreach ($admins as $admin) {
+                $admin->notify(new TicketNotification($ticket, $isOnBehalf ? 'on_behalf_approval_required' : 'created'));
+            }
+        } catch (\Exception $e) {
+            Log::error('Notification Failed: ' . $e->getMessage());
+        }
+
+        $successMsg = $isOnBehalf 
+            ? 'Tiket berhasil dibuat atas nama pengguna lain dan saat ini menunggu approval Admin/Atasan.' 
+            : 'Ticket created successfully.';
+
+        return redirect()->route('tickets.show', $ticket)->with('success', $successMsg);
     }
-
-    $successMsg = $isOnBehalf 
-        ? 'Tiket berhasil dibuat atas nama pengguna lain dan saat ini menunggu approval Admin/Atasan.' 
-        : 'Ticket created successfully.';
-
-    return redirect()->route('tickets.show', $ticket)->with('success', $successMsg);
-}
 
     public function downloadAttachment($ticketId, $attachmentId)
 {

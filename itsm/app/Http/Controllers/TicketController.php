@@ -330,7 +330,6 @@ class TicketController extends Controller
 
     public function downloadAttachment($ticketId, $attachmentId)
 {
-    // Menggunakan ID langsung dari parameter URL
     $ticket = \App\Models\Ticket::find($ticketId);
     if (! $ticket) {
         abort(404, 'Tiket tidak ditemukan.');
@@ -354,12 +353,11 @@ class TicketController extends Controller
         }
     }
 
-    // Jika ada parameter 'mode=view', tampilkan file langsung di browser (tanpa diunduh)
+    // Tambahkan kondisi mode view di bawah ini
     if (request()->query('mode') === 'view') {
         return \Illuminate\Support\Facades\Storage::disk($disk)->response($path);
     }
 
-    // Jika tidak ada parameter (default), paksa unduh file
     return \Illuminate\Support\Facades\Storage::disk($disk)->download($path, $attachment->original_name);
 }
 
@@ -368,10 +366,17 @@ class TicketController extends Controller
         $this->authorizeTicketAccess($ticket);
 
         $ticket->load([
-            'requester', 'assignee', 'assigner', 'priority', 'category',
-            'subCategory', 'comments.user', 'attachments', 'histories.user',
-            'rating', 'assets',
-        ]);
+        'requester',
+        'assignee',
+        'priority',
+        'category',
+        'company',
+        'attachments' => function ($q) {
+            $q->whereNull('ticket_comment_id');
+        },
+        'comments.user',
+        'comments.attachments' // Supaya lampiran chat dipanggil lewat relasi komentar saja
+    ]);
 
         $technicians = User::whereIn('role', ['technician', 'admin'])->where('is_active', true)->get();
 
@@ -510,12 +515,13 @@ class TicketController extends Controller
             'attachments.*.max' => 'Ukuran setiap file lampiran maksimal 20MB.'
         ]);
 
+            // 1. Simpan komentar/balasan
         $comment = $ticket->comments()->create([
-            'user_id' => Auth::id(),
+            'user_id' => auth()->id(),
             'comment' => $request->comment,
-            'is_internal' => $request->boolean('is_internal'),
+            'is_internal' => $request->has('is_internal'),
         ]);
-
+        
         // 2. Simpan lampiran jika ada
         if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments') as $file) {

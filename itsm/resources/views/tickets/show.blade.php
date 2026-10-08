@@ -98,11 +98,15 @@
             </div>
             <div class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{{ $ticket->description }}</div>
 
-            @if($ticket->attachments->count() > 0)
+
+            @php
+                $mainAttachments = $ticket->attachments->whereNull('ticket_comment_id');
+            @endphp
+            @if($mainAttachments->count() > 0)
             <div class="mt-5 pt-5 border-t border-gray-100">
-                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Attachments ({{ $ticket->attachments->count() }})</p>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Attachments ({{ $mainAttachments->count() }})</p>
                 <div class="space-y-2">
-                    @foreach($ticket->attachments as $att)
+                    @foreach($mainAttachments as $att)
                         @php
                             $ext = pathinfo($att->path, PATHINFO_EXTENSION);
                             $viewUrl = route('tickets.attachment.download', ['ticketId' => $ticket->id, 'attachmentId' => $att->id, 'mode' => 'view']);

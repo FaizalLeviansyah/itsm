@@ -80,6 +80,8 @@ Route::middleware('auth')->group(function () {
 
     // Tickets
     Route::resource('tickets', TicketController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
+    // Route khusus preview / download dari TicketController (tidak mengganggu closure lama)
+    Route::get('/tickets/{ticket}/attachments/{attachment}/preview', [TicketController::class, 'downloadAttachment'])->name('tickets.downloadAttachment');
     Route::post('/tickets/{ticket}/assign', [TicketController::class, 'assign'])->name('tickets.assign');
     Route::post('/tickets/{ticket}/status', [TicketController::class, 'updateStatus'])->name('tickets.status');
     Route::post('/tickets/{ticket}/comment', [TicketController::class, 'addComment'])->name('tickets.comment');

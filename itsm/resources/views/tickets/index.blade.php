@@ -139,7 +139,8 @@
                     <td class="px-6 py-4">
                         @if($ticket->attachments && $ticket->attachments->count() > 0)
                             <div class="flex gap-1">
-                                @foreach($ticket->attachments->take(2) as $att)
+                                @foreach($ticket->attachments->where('ticket_comment_id', null)->take(2) as $att)
+                                <a href="{{ route('tickets.downloadAttachment', ['ticket' => $ticket->id, 'attachment' => $att->id]) }}?mode=view" target="_blank" ...>
                                     @php
                                         $ext = pathinfo($att->path, PATHINFO_EXTENSION);
                                         $viewUrl = route('tickets.attachment.download', ['ticketId' => $ticket->id, 'attachmentId' => $att->id, 'mode' => 'view']);

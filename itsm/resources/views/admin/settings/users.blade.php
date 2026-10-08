@@ -36,14 +36,27 @@
 
 <!-- Search & Filter -->
 <div class="bg-white rounded-xl border border-gray-100 p-4 mb-6">
-    <form method="GET" class="flex gap-3">
-        <div class="w-48">
-            <select name="user_type" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500" onchange="this.form.submit()">
+    <form method="GET" class="flex gap-3 items-center">
+        <!-- Filter Tipe User (Semua User / Office / Vessel) -->
+        <div class="w-44">
+            <select name="user_type" id="user_type_select" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500" onchange="handleUserTypeChange(this)">
                 <option value="">Semua User</option>
                 <option value="office" {{ request('user_type') == 'office' ? 'selected' : '' }}>Office</option>
                 <option value="vessel" {{ request('user_type') == 'vessel' ? 'selected' : '' }}>Vessel</option>
             </select>
         </div>
+
+        <!-- Filter Pilihan PT (Hanya muncul jika Office atau Semua User dipilih) -->
+        <!-- Filter Pilihan PT (Hanya muncul jika Office atau Semua User dipilih) -->
+        <div class="w-64" id="company_filter_wrapper">
+            <select name="company_id" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500" onchange="this.form.submit()">
+                <option value="">Semua PT Office</option>
+                <option value="1" {{ request('company_id') == '1' ? 'selected' : '' }}>PT Amarin Ship Management</option>
+                <option value="2" {{ request('company_id') == '2' ? 'selected' : '' }}>PT Caraka Tirta Pratama</option>
+                <option value="3" {{ request('company_id') == '3' ? 'selected' : '' }}>PT Amarin Crewing Services</option>
+            </select>
+        </div>
+
         <div class="relative flex-1">
             <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
             <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari user..." class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500">
@@ -62,6 +75,7 @@
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">User</th>
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Email</th>
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Department</th>
+                    <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Perusahaan (PT)</th>
                     <th class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Role</th>
                     <th class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Status</th>
                     <th class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Source</th>
@@ -83,6 +97,28 @@
                     </td>
                     <td class="px-6 py-4 text-sm text-gray-600">{{ $user->email }}</td>
                     <td class="px-6 py-4 text-sm text-gray-600">{{ $user->department ?? $user->job_title ?? '-' }}</td>
+                    <td class="px-6 py-4 text-sm">
+                        @php
+                            $companyName = $user->company->name ?? 'No Company';
+                        @endphp
+
+                        @if(str_contains($companyName, 'Ship Management'))
+                            <!-- Hijau untuk ASM -->
+                            <span class="px-2.5 py-1 bg-green-50 text-green-800 border border-green-200 rounded-md font-medium text-xs">
+                                {{ $companyName }}
+                            </span>
+                        @elseif(str_contains($companyName, 'Crewing'))
+                            <!-- Kuning untuk ACS -->
+                            <span class="px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-md font-medium text-xs">
+                                {{ $companyName }}
+                            </span>
+                        @else
+                            <!-- Merah untuk CTP / Lainnya -->
+                            <span class="px-2.5 py-1 bg-red-50 text-red-800 border border-red-200 rounded-md font-medium text-xs">
+                                {{ $companyName }}
+                            </span>
+                        @endif
+                    </td>
                     <td class="px-6 py-4 text-center">
                         <form action="{{ route('admin.settings.users.role', $user) }}" method="POST" class="inline">
                             @csrf @method('PUT')
@@ -113,4 +149,27 @@
     <div class="px-6 py-4 border-t border-gray-100">{{ $users->withQueryString()->links() }}</div>
     @endif
 </div>
+
+<script>
+    function handleUserTypeChange(selectElement) {
+        const wrapper = document.getElementById('company_filter_wrapper');
+        if (selectElement.value === 'vessel') {
+            wrapper.style.display = 'none';
+            // Reset company filter when switching to vessel so it doesn't conflict
+            wrapper.querySelector('select').value = '';
+        } else {
+            wrapper.style.display = 'block';
+        }
+        selectElement.form.submit();
+    }
+
+    // Jalankan saat load halaman untuk memastikan state awal sesuai
+    document.addEventListener("DOMContentLoaded", function() {
+        const typeSelect = document.getElementById('user_type_select');
+        const wrapper = document.getElementById('company_filter_wrapper');
+        if (typeSelect.value === 'vessel') {
+            wrapper.style.display = 'none';
+        }
+    });
+</script>
 @endsection

@@ -28,6 +28,7 @@ class SettingsController extends Controller
     }
 
     // User Management
+    // User Management
     public function users(Request $request)
     {
         $query = User::query();
@@ -39,6 +40,45 @@ class SettingsController extends Controller
             } elseif ($request->user_type == 'office') {
                 $query->where(function($q) {
                     $q->where('department', '!=', 'Vessel')->orWhereNull('department');
+                });
+            }
+        }
+
+        // Filter berdasarkan PT (Company ID) disesuaikan dengan accessor/domain
+        // Filter berdasarkan PT (Company ID)
+        if ($request->has('company_id') && $request->company_id != '') {
+            $companyId = $request->company_id;
+            
+            if ($companyId == '3') {
+                // PT Amarin Crewing Services
+                $query->where(function($q) {
+                    $q->where('company_id', 3)
+                      ->orWhere('email', 'like', '%@acs.amarin.co.id%')
+                      ->orWhere('email', 'like', '%@gmail.com%')
+                      ->orWhere('department', 'like', '%crewing%');
+                });
+            } elseif ($companyId == '2') {
+                // PT Caraka Tirta Pratama
+                $query->where(function($q) {
+                    $q->where('company_id', 2)
+                      ->orWhere('email', 'like', '%caraka%')
+                      ->orWhere('department', 'like', '%caraka%');
+                });
+            } elseif ($companyId == '1') {
+                // PT Amarin Ship Management (Hanya email resmi perusahaan, mutlak tanpa gmail, caraka, dan acs)
+                $query->where(function($q) {
+                    $q->where('company_id', 1)
+                      ->orWhere(function($subQ) {
+                          $subQ->where(function($inner) {
+                              $inner->where('email', 'like', '%@amarinshipmgmt.com%')
+                                    ->orWhere('email', 'like', '%@amarinshipmanagement.com%')
+                                    ->orWhere('email', 'like', '%itoperation%')
+                                    ->orWhere('email', 'like', '%head.it%');
+                          })
+                          ->where('email', 'not like', '%@gmail.com%')
+                          ->where('email', 'not like', '%@caraka.amarin.co.id%')
+                          ->where('email', 'not like', '%@acs.amarin.co.id%');
+                      });
                 });
             }
         }

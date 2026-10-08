@@ -69,24 +69,30 @@ class User extends Authenticatable
     }
 
     public function getCompanyAttribute()
-{
-    // Jika relasi company sudah ada, ambil datanya
-    if ($this->relationLoaded('company') && $this->getRelation('company')) {
-        return $this->getRelation('company');
-    }
-    
-    if ($this->company_id) {
-        $company = \App\Models\Company::find($this->company_id);
-        if ($company) return $company;
-    }
+    {
+        if ($this->relationLoaded('company') && $this->getRelation('company')) {
+            return $this->getRelation('company');
+        }
+        
+        if ($this->company_id) {
+            $company = \App\Models\Company::find($this->company_id);
+            if ($company) return $company;
+        }
 
-    // --- AUTO DETEKSI OTOMATIS BERDASARKAN EMAIL/KONDISI ---
-    $email = strtolower($this->email ?? '');
-    if (str_contains($email, 'amarin') || str_contains($email, 'itoperation')) {
-        return \App\Models\Company::find(1) ?? (object)['name' => 'PT Amarin Ship Management'];
-    }
+        $email = strtolower($this->email ?? '');
+        $department = strtolower($this->department ?? '');
 
-    // Default fallback jika tidak satupun cocok
-    return \App\Models\Company::first() ?? (object)['name' => 'PT Amarin Ship Management'];
-}
+        // Deteksi Caraka Tirta Pratama
+        if (str_contains($email, 'caraka') || str_contains($department, 'caraka')) {
+            return \App\Models\Company::find(2) ?? (object)['name' => 'PT Caraka Tirta Pratama'];
+        }
+
+        // Deteksi Amarin Ship Management (Hanya email resmi perusahaan)
+        if (str_contains($email, '@amarinshipmgmt.com') || str_contains($email, '@amarinshipmanagement.com') || str_contains($email, 'itoperation') || str_contains($email, 'head.it')) {
+            return \App\Models\Company::find(1) ?? (object)['name' => 'PT Amarin Ship Management'];
+        }
+
+        // Selebihnya (termasuk semua yang pakai @gmail.com) masuk ke PT Amarin Crewing Services
+        return \App\Models\Company::find(3) ?? (object)['name' => 'PT Amarin Crewing Services'];
+    }
 }

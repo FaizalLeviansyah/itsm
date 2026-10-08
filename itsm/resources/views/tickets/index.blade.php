@@ -200,11 +200,14 @@
                     </td>
                     <td class="px-6 py-4 text-sm text-gray-600">{{ $ticket->category->name }}</td>
                     <td class="px-6 py-4">
+                        @php
+                            $reqName = $ticket->requester->name ?? 'Unknown';
+                        @endphp
                         <div class="flex items-center gap-2">
                             <div class="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center">
-                                <span class="text-[9px] font-bold text-gray-600">{{ strtoupper(substr($ticket->requester->name, 0, 2)) }}</span>
+                                <span class="text-[9px] font-bold text-gray-600">{{ strtoupper(substr($reqName, 0, 2)) }}</span>
                             </div>
-                            <span class="text-sm text-gray-700">{{ Str::limit($ticket->requester->name, 15) }}</span>
+                            <span class="text-sm text-gray-700">{{ Str::limit($reqName, 20) }}</span>
                         </div>
                     </td>
                     <td class="px-6 py-4">

@@ -360,11 +360,14 @@
         <div class="bg-white rounded-xl border border-gray-100 p-5">
             <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Requester Info</p>
             <div class="flex items-center gap-3 mb-4">
+                @php
+                    $detailReqName = $ticket->requester?->name ?? 'User Non-Aktif';
+                @endphp
                 <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-                    <span class="text-sm font-bold text-gray-600">{{ strtoupper(substr($ticket->requester?->name ?? 'NA', 0, 2)) }}</span>
+                    <span class="text-sm font-bold text-gray-600">{{ strtoupper(substr($detailReqName, 0, 2)) }}</span>
                 </div>
                 <div>
-                    <p class="text-sm font-semibold text-gray-900">{{ $ticket->requester?->name ?? 'User Non-Aktif' }}</p>
+                    <p class="text-sm font-semibold text-gray-900">{{ $detailReqName }}</p>
                     <p class="text-xs text-gray-500">{{ $ticket->requester?->position ?? ($ticket->requester?->role ?? 'N/A') }}</p>
                 </div>
             </div>

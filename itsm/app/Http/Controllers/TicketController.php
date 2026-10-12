@@ -397,42 +397,75 @@ class TicketController extends Controller
    public function assign(Request $request, Ticket $ticket)
     {
         $request->validate([
-            'assigned_to' => 'required|exists:users,id',
-            'note' => 'nullable|string|max:500' // Validasi untuk form catatan
+            'assigned_to' => 'required',
+            'note' => 'nullable|string|max:500'
         ]);
 
-        $targetUser = User::find($request->assigned_to);
-        
-        if (Auth::user()->role === 'technician' && $targetUser->role !== 'admin') {
-            return back()->with('error', 'Akses ditolak: Technician hanya dapat melakukan Reassign ke Admin.');
+        $assignedIds = is_array($request->assigned_to) ? $request->assigned_to : [$request->assigned_to];
+
+        foreach ($assignedIds as $userId) {
+            $targetUser = User::find($userId);
+            if (!$targetUser) {
+                return back()->with('error', 'User yang dipilih tidak ditemukan.');
+            }
+            if (Auth::user()->role === 'technician' && $targetUser->role !== 'admin') {
+                return back()->with('error', 'Akses ditolak: Technician hanya dapat melakukan Reassign ke Admin.');
+            }
         }
 
         $oldAssignee = $ticket->assigned_to;
-        
-        // Update tiket (Ini akan secara otomatis memicu Observer updated() di TicketObserver)
-        $ticket->update([
-            'assigned_to' => $request->assigned_to,
-            'assigned_by' => Auth::id(),
-            'assigned_at' => now(),
-            'status' => 'assigned',
-        ]);
 
-        // Prioritaskan catatan dari form, jika kosong gunakan pesan default
-        $historyNote = $request->note ?: (Auth::user()->role === 'technician' ? 'Ticket reassigned to Admin' : 'Ticket assigned to technician');
+        if (count($assignedIds) > 1 && Auth::user()->role === 'admin') {
+            $ticket->assignedTechnicians()->sync($assignedIds);
+            
+            $ticket->update([
+                'assigned_by' => Auth::id(),
+                'assigned_at' => now(),
+                'status' => 'assigned',
+                'assigned_to' => null, 
+            ]);
 
-        TicketHistory::create([
-            'ticket_id' => $ticket->id,
-            'user_id' => Auth::id(),
-            'field' => 'assigned_to',
-            'old_value' => $oldAssignee ? User::find($oldAssignee)->name : null,
-            'new_value' => $targetUser->name,
-            'note' => $historyNote, // Simpan catatan
-        ]);
+            $technicianNames = User::whereIn('id', $assignedIds)->pluck('name')->implode(', ');
+            $historyNote = $request->note ?: "Multiple assigned to: {$technicianNames}";
 
-        // Catatan: Kirim log pemberitahuan khusus untuk Admin Dashboard (opsional) 
-        // agar admin utama tetap terpantau via WA internal jika diperlukan
+            TicketHistory::create([
+                'ticket_id' => $ticket->id,
+                'user_id' => Auth::id(),
+                'field' => 'assigned_to',
+                'old_value' => $oldAssignee ? User::find($oldAssignee)?->name : null,
+                'new_value' => $technicianNames,
+                'note' => $historyNote,
+            ]);
+        } else {
+            $singleTargetId = $assignedIds[0];
+            $targetUser = User::find($singleTargetId);
+
+            if (method_exists($ticket, 'assignedTechnicians')) {
+                $ticket->assignedTechnicians()->sync([$singleTargetId]);
+            }
+
+            $ticket->update([
+                'assigned_to' => $singleTargetId,
+                'assigned_by' => Auth::id(),
+                'assigned_at' => now(),
+                'status' => 'assigned',
+            ]);
+
+            $historyNote = $request->note ?: (Auth::user()->role === 'technician' ? 'Ticket reassigned to Admin' : 'Ticket assigned to technician');
+
+            TicketHistory::create([
+                'ticket_id' => $ticket->id,
+                'user_id' => Auth::id(),
+                'field' => 'assigned_to',
+                'old_value' => $oldAssignee ? User::find($oldAssignee)?->name : null,
+                'new_value' => $targetUser->name,
+                'note' => $historyNote,
+            ]);
+        }
+
         try {
-            $this->notifyAdminViaWa($ticket, 'Ticket Assigned', 'Assigned to: ' . $targetUser->name . ($request->note ? "\nCatatan: " . $request->note : ""));
+            $namesList = User::whereIn('id', $assignedIds)->pluck('name')->implode(', ');
+            $this->notifyAdminViaWa($ticket, 'Ticket Assigned', 'Assigned to: ' . $namesList . ($request->note ? "\nCatatan: " . $request->note : ""));
         } catch (\Exception $e) {
             Log::error('WA Admin Alert Failed: ' . $e->getMessage());
         }
@@ -477,8 +510,16 @@ class TicketController extends Controller
         }
 
         if ($request->status === 'resolved') {
+            // Wajibkan pengisian catatan/komentar solusi saat resolve
+            if (empty(trim($request->resolution_notes))) {
+                return back()->with('error', 'Wajib memberikan catatan/komentar solusi sebelum menyelesaikan (Resolve) tiket.');
+            }
+
             $data['resolved_at'] = now();
             $data['resolution_notes'] = $request->resolution_notes;
+            // Kunci penanggung jawab utama ke teknisi pertama yang menyelesaikan
+            $data['assigned_to'] = Auth::id();
+            
         } elseif ($request->status === 'closed') {
             $data['closed_at'] = now();
         } elseif ($request->status === 'in_progress' && !$ticket->first_response_at) {
@@ -752,15 +793,21 @@ class TicketController extends Controller
             // User biasa hanya melihat tiket miliknya sendiri
             $query->where('requester_id', $user->id);
         } elseif ($user->role === 'technician') {
-            // Teknisi melihat tiket yang di-assign ke dia ATAU tiket yang masih unassigned
+            // Teknisi melihat tiket yang di-assign langsung, via multi-assign, atau unassigned
             $query->where(function($q) use ($user) {
                 $q->where('assigned_to', $user->id)
+                  ->orWhereHas('assignedTechnicians', function($t) use ($user) {
+                      $t->where('user_id', $user->id);
+                  })
                   ->orWhereNull('assigned_to');
             });
         } elseif ($user->role === 'admin') {
-            // Admin bisa melihat tiket yang di-assign ke dia atau unassigned di tab My Tickets
+            // Admin bisa melihat tiket yang di-assign langsung, via multi-assign, atau unassigned
             $query->where(function($q) use ($user) {
                 $q->where('assigned_to', $user->id)
+                  ->orWhereHas('assignedTechnicians', function($t) use ($user) {
+                      $t->where('user_id', $user->id);
+                  })
                   ->orWhereNull('assigned_to');
             });
         }
@@ -786,7 +833,6 @@ class TicketController extends Controller
         $priorities = Priority::all();
         $categories = Category::where('is_active', true)->get();
 
-        // Anda bisa membuat view khusus 'tickets.my-tickets' atau menggunakan view 'tickets.index' dengan judul berbeda
         return view('tickets.index', compact('tickets', 'priorities', 'categories'))->with('isMyTickets', true);
     }
 }

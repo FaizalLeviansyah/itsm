@@ -130,4 +130,8 @@ class Ticket extends Model
         }
         return false;
     }
+    public function assignedTechnicians()
+    {
+        return $this->belongsToMany(User::class, 'ticket_technicians', 'ticket_id', 'user_id')->withTimestamps();
+    }
 }

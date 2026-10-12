@@ -65,7 +65,7 @@ Route::middleware('auth')->group(function () {
     }
 
     // 4. Jika tidak ada parameter (klik tombol unduh di show.blade.php), paksa unduh file
-    return \Illuminate\Support\Facades\Storage::disk($disk)->download($path, $attachment->original_name);
+    return \Illuminate\Support\Facades\Storage::disk($disk)->download($path, $atitsmtachment->original_name);
 })->middleware('auth')->name('tickets.attachment.download');
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');

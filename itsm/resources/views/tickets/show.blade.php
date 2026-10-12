@@ -568,12 +568,12 @@
         <form action="{{ route('tickets.assign', $ticket) }}" method="POST">
             @csrf
             
-            <!-- Pilihan Teknisi/Admin -->
-            <select name="assigned_to" required class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm mb-4">
+            <!-- Pilihan Teknisi/Admin (Mendukung Multi-Assign untuk Admin) -->
+            <label class="block text-xs font-semibold text-gray-500 uppercase mb-2">Pilih Teknisi / Admin</label>
+            <select name="assigned_to[]" {{ Auth::user()->role === 'admin' ? 'multiple="multiple"' : '' }} required class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm mb-4 select2-multiple">
                 @if(Auth::user()->role === 'admin')
-                    <option value="">Select Technician / Admin</option>
                     @foreach($technicians as $tech)
-                    <option value="{{ $tech->id }}" {{ $ticket->assigned_to == $tech->id ? 'selected' : '' }}>{{ $tech->name }} ({{ ucfirst($tech->role) }})</option>
+                    <option value="{{ $tech->id }}" {{ $ticket->assignedTechnicians->contains($tech->id) ? 'selected' : '' }}>{{ $tech->name }} ({{ ucfirst($tech->role) }})</option>
                     @endforeach
                 @else
                     <option value="">Pilih Admin untuk Reassign</option>
@@ -583,14 +583,14 @@
                 @endif
             </select>
 
-            <!-- INPUT CATATAN BARU DITAMBAHKAN DI SINI -->
-            <textarea name="note" rows="2" class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm mb-4" placeholder="{{ Auth::user()->role === 'admin' ? 'Catatan / Alasan Reassign (Opsional)...' : 'Alasan eskalasi ke Admin (Wajib diisi jika perlu)...' }}"></textarea>
+            <!-- Catatan / Alasan -->
+            <textarea name="note" rows="2" class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm mb-4" placeholder="{{ Auth::user()->role === 'admin' ? 'Catatan / Alasan Assign (Opsional)...' : 'Alasan eskalasi ke Admin (Wajib diisi jika perlu)...' }}"></textarea>
 
             <div class="flex justify-end gap-2">
                 <button type="button" onclick="document.getElementById('assign-modal').classList.add('hidden')" class="px-4 py-2 border border-gray-200 rounded-lg text-sm">Cancel</button>
                 <button type="submit" class="px-4 py-2 bg-brand-500 text-white rounded-lg text-sm font-semibold">
                     @if(Auth::user()->role === 'admin')
-                        {{ $ticket->assigned_to ? 'Reassign' : 'Assign' }}
+                        {{ $ticket->assigned_to || $ticket->assignedTechnicians()->count() > 0 ? 'Reassign' : 'Assign' }}
                     @else
                         Reassign
                     @endif

@@ -731,4 +731,62 @@ class TicketController extends Controller
 
         return back()->with('success', 'Terima kasih! Tiket telah berhasil ditutup dan ulasan Anda telah disimpan.');
     }
+
+    public function myTickets(Request $request)
+    {
+        $user = Auth::user();
+        
+        $query = Ticket::with([
+            'requester.company', 
+            'assignee', 
+            'priority', 
+            'category', 
+            'company',
+            'attachments' => function ($q) {
+                $q->whereNull('ticket_comment_id');
+            }
+        ]);
+
+        // Filter khusus berdasarkan role user yang login untuk halaman My Tickets
+        if ($user->role === 'user') {
+            // User biasa hanya melihat tiket miliknya sendiri
+            $query->where('requester_id', $user->id);
+        } elseif ($user->role === 'technician') {
+            // Teknisi melihat tiket yang di-assign ke dia ATAU tiket yang masih unassigned
+            $query->where(function($q) use ($user) {
+                $q->where('assigned_to', $user->id)
+                  ->orWhereNull('assigned_to');
+            });
+        } elseif ($user->role === 'admin') {
+            // Admin bisa melihat tiket yang di-assign ke dia atau unassigned di tab My Tickets
+            $query->where(function($q) use ($user) {
+                $q->where('assigned_to', $user->id)
+                  ->orWhereNull('assigned_to');
+            });
+        }
+
+        // Filter tambahan (Status, Priority, Category, Search) jika ada
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+        if ($request->filled('priority')) {
+            $query->where('priority_id', $request->priority);
+        }
+        if ($request->filled('category')) {
+            $query->where('category_id', $request->category);
+        }
+        if ($request->filled('search')) {
+            $query->where(function ($q) use ($request) {
+                $q->where('ticket_number', 'like', "%{$request->search}%")
+                  ->orWhere('title', 'like', "%{$request->search}%");
+            });
+        }
+
+        $tickets = $query->orderByDesc('created_at')->paginate(15);
+        $priorities = Priority::all();
+        $categories = Category::where('is_active', true)->get();
+
+        // Anda bisa membuat view khusus 'tickets.my-tickets' atau menggunakan view 'tickets.index' dengan judul berbeda
+        return view('tickets.index', compact('tickets', 'priorities', 'categories'))->with('isMyTickets', true);
+    }
 }

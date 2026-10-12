@@ -79,6 +79,7 @@ Route::middleware('auth')->group(function () {
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
 
     // Tickets
+    Route::get('/my-tickets', [TicketController::class, 'myTickets'])->name('tickets.my'); 
     Route::resource('tickets', TicketController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
     // Route khusus preview / download dari TicketController (tidak mengganggu closure lama)
     Route::get('/tickets/{ticket}/attachments/{attachment}/preview', [TicketController::class, 'downloadAttachment'])->name('tickets.downloadAttachment');

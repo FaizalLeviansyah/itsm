@@ -162,10 +162,10 @@
                 <a href="{{ route('dashboard') }}" class="sidebar-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
                     <i class="fas fa-th-large w-5 text-center"></i><span>Dashboard</span>
                 </a>
-                <a href="{{ route('tickets.index') }}" class="sidebar-link {{ request()->routeIs('tickets.*') && !request()->get('view') ? 'active' : '' }}">
+                <a href="{{ route('tickets.index') }}" class="sidebar-link {{ request()->routeIs('tickets.index') && !request()->routeIs('tickets.my') ? 'active' : '' }}">
                     <i class="fas fa-ticket-alt w-5 text-center"></i><span>All Tickets</span>
                 </a>
-                <a href="{{ route('tickets.index', ['view' => 'mine']) }}" class="sidebar-link {{ request()->get('view') === 'mine' ? 'active' : '' }}">
+                <a href="{{ route('tickets.my') }}" class="sidebar-link {{ request()->routeIs('tickets.my') ? 'active' : '' }}">
                     <i class="fas fa-user-check w-5 text-center"></i><span>My Tickets</span>
                 </a>
                 <a href="{{ route('assets.index') }}" class="sidebar-link {{ request()->routeIs('assets.*') ? 'active' : '' }}">
@@ -302,10 +302,10 @@
                 <a href="{{ route('dashboard') }}" class="sidebar-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
                     <i class="fas fa-th-large w-5 text-center"></i><span>Dashboard</span>
                 </a>
-                <a href="{{ route('tickets.index') }}" class="sidebar-link {{ request()->routeIs('tickets.*') && !request()->get('view') ? 'active' : '' }}">
+                <a href="{{ route('tickets.index') }}" class="sidebar-link {{ request()->routeIs('tickets.index') && !request()->routeIs('tickets.my') ? 'active' : '' }}">
                     <i class="fas fa-ticket-alt w-5 text-center"></i><span>All Tickets</span>
                 </a>
-                <a href="{{ route('tickets.index', ['view' => 'mine']) }}" class="sidebar-link {{ request()->get('view') === 'mine' ? 'active' : '' }}">
+                <a href="{{ route('tickets.my') }}" class="sidebar-link {{ request()->routeIs('tickets.my') ? 'active' : '' }}">
                     <i class="fas fa-user-check w-5 text-center"></i><span>My Tickets</span>
                 </a>
                 <a href="{{ route('assets.index') }}" class="sidebar-link {{ request()->routeIs('assets.*') ? 'active' : '' }}">

@@ -606,4 +606,44 @@
 
     @stack('scripts')
 </body>
+<!-- GLOBAL LOADING MODAL & PROTECTION -->
+<div id="global-loading-modal" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-xs hidden">
+    <div class="bg-white rounded-2xl p-6 shadow-2xl flex flex-col items-center max-w-xs w-full mx-4 border border-gray-100 animate-scale-up">
+        <!-- Spinner Animasi -->
+        <div class="w-12 h-12 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin mb-4"></div>
+        <h3 class="text-base font-bold text-gray-900 mb-1">Memproses Aksi...</h3>
+        <p class="text-xs text-gray-500 text-center">Mohon tunggu sebentar, sistem sedang mengirim data.</p>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    // Tangkap semua form submit di seluruh aplikasi
+    document.querySelectorAll("form").forEach(form => {
+        form.addEventListener("submit", function (e) {
+            // Cek apakah form sudah pernah disubmit untuk mencegah double click
+            if (form.dataset.submitted === "true") {
+                e.preventDefault();
+                return;
+            }
+
+            // Tandai form sebagai sudah disubmit
+            form.dataset.submitted = "true";
+
+            // Disable semua tombol submit di form ini agar tidak bisa diklik lagi
+            const submitButtons = form.querySelectorAll("button[type='submit'], input[type='submit']");
+            submitButtons.forEach(btn => {
+                btn.disabled = true;
+                btn.classList.add("opacity-60", "cursor-not-allowed");
+            });
+
+            // Tampilkan Pop-up Animasi Loading
+            const loadingModal = document.getElementById("global-loading-modal");
+            if (loadingModal) {
+                loadingModal.classList.remove("hidden");
+            }
+        });
+    });
+});
+</script>
 </html>

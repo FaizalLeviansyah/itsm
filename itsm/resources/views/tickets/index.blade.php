@@ -251,7 +251,9 @@
                         <span class="text-xs text-gray-400 italic">Unassigned</span>
                         @endif
                     </td>
-                    <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">{{ $ticket->created_at->format('Y-m-d H:i') }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                        {{ $ticket->created_at->setTimezone('Asia/Jakarta')->format('Y-m-d H:i') }}
+                    </td>
                 </tr>
                 @empty
                 <tr>

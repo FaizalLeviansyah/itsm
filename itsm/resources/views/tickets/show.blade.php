@@ -569,7 +569,11 @@
             @csrf
             
             <!-- Pilihan Teknisi/Admin (Mendukung Multi-Assign untuk Admin) -->
-            <label class="block text-xs font-semibold text-gray-500 uppercase mb-2">Pilih Teknisi / Admin</label>
+            <div class="mb-3">
+                <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Pilih Teknisi / Admin</label>
+                <p class="text-[11px] text-brand-600 font-medium">💡 Tips: Anda dapat memilih lebih dari 1 teknisi untuk penugasan kolaboratif (independent).</p>
+            </div>
+            
             <select name="assigned_to[]" {{ Auth::user()->role === 'admin' ? 'multiple="multiple"' : '' }} required class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm mb-4 select2-multiple">
                 @if(Auth::user()->role === 'admin')
                     @foreach($technicians as $tech)

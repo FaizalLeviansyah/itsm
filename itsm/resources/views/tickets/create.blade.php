@@ -46,8 +46,29 @@
                                         $locationType = $isVessel ? 'vessel' : 'office';
                                     @endphp
                                     
+                                    @php
+                                        // Format tampilan yang lebih profesional
+                                        $displayName = $u->name;
+                                        $jobTitle = $u->job_title ?? '';
+                                        $empNumber = $u->employee_number ?? $u->name;
+                                        
+                                        // Cek apakah name hanya berisi NIK/angka (pattern: P001, 200104030, dll)
+                                        $isNameNumeric = preg_match('/^[P]?\d+$/', $u->name);
+                                        
+                                        if ($isNameNumeric && $jobTitle) {
+                                            // Format untuk user dengan NIK sebagai nama: "KEUANGAN (200104030) - PT Caraka Tirta Pratama"
+                                            $optionText = strtoupper($jobTitle) . ' (' . $empNumber . ') - ' . ($u->company->name ?? 'No Company');
+                                        } else {
+                                            // Format untuk user dengan nama lengkap: "John Doe - IT Manager (PT Amarin Ship Management)"
+                                            $optionText = $displayName;
+                                            if ($jobTitle) {
+                                                $optionText .= ' - ' . $jobTitle;
+                                            }
+                                            $optionText .= ' (' . ($u->company->name ?? 'No Company') . ')';
+                                        }
+                                    @endphp
                                     <option value="{{ $u->id }}" data-location="{{ $locationType }}" {{ old('requester_id') == $u->id ? 'selected' : '' }}>
-                                        {{ $u->name }} | {{ $u->email }} ({{ $u->company->name ?? 'No Company' }} - {{ ucfirst($u->role) }})
+                                        {{ $optionText }}
                                     </option>
                                 @endforeach
                             </select>

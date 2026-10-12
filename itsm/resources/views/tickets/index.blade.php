@@ -201,7 +201,19 @@
                     <td class="px-6 py-4 text-sm text-gray-600">{{ $ticket->category->name }}</td>
                     <td class="px-6 py-4">
                         @php
-                            $reqName = $ticket->requester->name ?? 'Unknown';
+                            $reqUser = $ticket->requester;
+                            $rawReqName = $reqUser->name ?? 'Unknown';
+                            $reqJobTitle = $reqUser->job_title ?? '';
+                            $reqEmpNumber = $reqUser->employee_number ?? $rawReqName;
+                            
+                            // Cek apakah name hanya berisi NIK/angka
+                            $isReqNameNumeric = preg_match('/^[P]?\d+$/', $rawReqName);
+                            
+                            if ($isReqNameNumeric && $reqJobTitle) {
+                                $reqName = strtoupper($reqJobTitle);
+                            } else {
+                                $reqName = $rawReqName;
+                            }
                         @endphp
                         <div class="flex items-center gap-2">
                             <div class="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center">

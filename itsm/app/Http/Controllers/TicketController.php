@@ -394,7 +394,7 @@ class TicketController extends Controller
         return view('tickets.show', compact('ticket', 'technicians', 'cannedResponses'));
     }
 
-    public function assign(Request $request, Ticket $ticket)
+   public function assign(Request $request, Ticket $ticket)
     {
         $request->validate([
             'assigned_to' => 'required|exists:users,id',
@@ -408,6 +408,8 @@ class TicketController extends Controller
         }
 
         $oldAssignee = $ticket->assigned_to;
+        
+        // Update tiket (Ini akan secara otomatis memicu Observer updated() di TicketObserver)
         $ticket->update([
             'assigned_to' => $request->assigned_to,
             'assigned_by' => Auth::id(),
@@ -427,12 +429,13 @@ class TicketController extends Controller
             'note' => $historyNote, // Simpan catatan
         ]);
 
-        $ticket->load(['assignee', 'requester', 'priority']);
-        
-        $this->waService->notifyTicketAssigned($ticket);
-        $this->notifyAdminViaWa($ticket, 'Ticket Assigned', 'Assigned to: ' . $targetUser->name . ($request->note ? "\nCatatan: " . $request->note : ""));
-
-        $ticket->assignee->notify(new TicketNotification($ticket, 'assigned'));
+        // Catatan: Kirim log pemberitahuan khusus untuk Admin Dashboard (opsional) 
+        // agar admin utama tetap terpantau via WA internal jika diperlukan
+        try {
+            $this->notifyAdminViaWa($ticket, 'Ticket Assigned', 'Assigned to: ' . $targetUser->name . ($request->note ? "\nCatatan: " . $request->note : ""));
+        } catch (\Exception $e) {
+            Log::error('WA Admin Alert Failed: ' . $e->getMessage());
+        }
 
         return back()->with('success', 'Ticket assigned successfully.');
     }

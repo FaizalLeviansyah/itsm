@@ -56,7 +56,17 @@
                             <h3 class="text-base font-bold text-amber-900">Tiket Menunggu Approval</h3>
                             <p class="text-xs text-amber-800 mt-0.5">
                                 Tiket ini dibuat oleh <strong>{{ $ticket->histories->first()?->user->name ?? 'Admin/Teknisi' }}</strong> 
-                                atas nama <strong>{{ $ticket->requester->name }}</strong>. Membutuhkan verifikasi Admin/Atasan agar dapat dijalankan.
+                                atas nama <strong>@php
+                                    $obReq = $ticket->requester;
+                                    $obName = $obReq->name ?? 'Unknown';
+                                    $obJob = $obReq->job_title ?? '';
+                                    $obEmp = $obReq->employee_number ?? $obName;
+                                    if (preg_match('/^[P]?\d+$/', $obName) && $obJob) {
+                                        echo strtoupper($obJob) . ' (' . $obEmp . ')';
+                                    } else {
+                                        echo $obName;
+                                    }
+                                @endphp</strong>. Membutuhkan verifikasi Admin/Atasan agar dapat dijalankan.
                             </p>
                         </div>
                     </div>
@@ -361,7 +371,20 @@
             <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Requester Info</p>
             <div class="flex items-center gap-3 mb-4">
                 @php
-                    $detailReqName = $ticket->requester?->name ?? 'User Non-Aktif';
+                    $reqUser = $ticket->requester;
+                    $reqName = $reqUser?->name ?? 'User Non-Aktif';
+                    $reqJobTitle = $reqUser?->job_title ?? '';
+                    $reqEmpNumber = $reqUser?->employee_number ?? $reqName;
+                    
+                    // Cek apakah name hanya berisi NIK/angka
+                    $isReqNameNumeric = preg_match('/^[P]?\d+$/', $reqName);
+                    
+                    if ($isReqNameNumeric && $reqJobTitle) {
+                        // Format: JOB TITLE (NIK)
+                        $detailReqName = strtoupper($reqJobTitle) . ' (' . $reqEmpNumber . ')';
+                    } else {
+                        $detailReqName = $reqName;
+                    }
                 @endphp
                 <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
                     <span class="text-sm font-bold text-gray-600">{{ strtoupper(substr($detailReqName, 0, 2)) }}</span>

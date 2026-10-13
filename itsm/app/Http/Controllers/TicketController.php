@@ -216,20 +216,21 @@ class TicketController extends Controller
         // 4. Pembuatan Data Tiket
         $ticket = Ticket::create([
             'ticket_number' => Ticket::generateTicketNumber(),
-            'title' => $validatedData['title'],
-            'description' => $validatedData['description'],
-            'category_id' => $validatedData['category_id'],
+            'public_token'  => Str::random(40), // <-- TAMBAHKAN BARIS INI
+            'title'         => $validatedData['title'],
+            'description'   => $validatedData['description'],
+            'category_id'   => $validatedData['category_id'],
             'sub_category_id' => $validatedData['sub_category_id'] ?? null,
-            'priority_id' => $validatedData['priority_id'],
-            'requester_id' => $actualRequesterId,
-            'company_id' => $actualCompanyId,
-            'type' => $validatedData['request_type'],
-            'impact' => $request->impact ?? 'low',
-            'urgency' => $request->urgency ?? 'low',
-            'location' => $request->location,
-            'vessel_name' => $request->vessel_name,
-            'status' => $initialStatus,
-            'due_date' => $this->slaCalculator->calculateDueDate(now(), $priority->sla_hours ?? 24),
+            'priority_id'   => $validatedData['priority_id'],
+            'requester_id'  => $actualRequesterId,
+            'company_id'    => $actualCompanyId,
+            'type'          => $validatedData['request_type'],
+            'impact'        => $request->impact ?? 'low',
+            'urgency'       => $request->urgency ?? 'low',
+            'location'      => $request->location,
+            'vessel_name'   => $request->vessel_name,
+            'status'        => $initialStatus,
+            'due_date'      => $this->slaCalculator->calculateDueDate(now(), $priority->sla_hours ?? 24),
         ]);
 
         // 5. Handling Approval atau Auto-Assign Rule
@@ -514,17 +515,24 @@ class TicketController extends Controller
             ]);
         }
 
-        if ($request->status === 'resolved') {
-            // Wajibkan pengisian catatan/komentar solusi saat resolve
-            if (empty(trim($request->resolution_notes))) {
-                return back()->with('error', 'Wajib memberikan catatan/komentar solusi sebelum menyelesaikan (Resolve) tiket.');
-            }
+        // Kirim Notifikasi WhatsApp & Email ke Requester dengan Tautan Publik Rating
+        if ($request->status === 'resolved' && $ticket->requester) {
+            try {
+                $publicLink = route('ticket.public.review', $ticket->public_token);
+                
+                $waMessage  = "*[IT HELPDESK - TICKET RESOLVED]*\n\n";
+                $waMessage .= "Halo *{$ticket->requester->name}*,\n";
+                $waMessage .= "Tiket Anda *{$ticket->ticket_number}* ({$ticket->title}) telah diselesaikan oleh teknisi.\n\n";
+                $waMessage .= "Silakan tinjau hasil kerja teknisi dan berikan rating/ulasan melalui tautan berikut (tanpa login):\n";
+                $waMessage .= "👉 {$publicLink}\n\n";
+                $waMessage .= "_Terima kasih_";
 
-            $data['resolved_at'] = now();
-            $data['resolution_notes'] = $request->resolution_notes;
-            // Kunci penanggung jawab utama ke teknisi pertama yang menyelesaikan
-            $data['assigned_to'] = Auth::id();
-            
+                if (!empty($ticket->requester->phone)) {
+                    $this->waService->sendMessage($ticket->requester->phone, $waMessage);
+                }
+            } catch (\Exception $e) {
+                Log::error('Gagal mengirim WA Public Review: ' . $e->getMessage());
+            }
         } elseif ($request->status === 'closed') {
             $data['closed_at'] = now();
         } elseif ($request->status === 'in_progress' && !$ticket->first_response_at) {

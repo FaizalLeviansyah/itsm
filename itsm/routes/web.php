@@ -23,6 +23,11 @@ use App\Http\Controllers\TicketController;
 use App\Http\Controllers\VesselDashboardController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schedule;
+use App\Http\Controllers\PublicTicketController;
+
+// Public Ticket Review & Rating (Tanpa Auth)
+Route::get('/ticket/review/{token}', [PublicTicketController::class, 'show'])->name('ticket.public.review');
+Route::post('/ticket/review/{token}/submit', [PublicTicketController::class, 'submit'])->name('ticket.public.submit');
 
 // Auth Routes
 Route::get('/', fn() => redirect('/login'));
@@ -39,7 +44,7 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout')->midd
 Route::middleware('auth')->group(function () {
 
  Route::get('/tickets/{ticketId}/attachments/{attachmentId}/download', function($ticketId, $attachmentId) {
-    // 1. Cari data lampiran secara manual (Pastikan TicketAttachment adalah nama model yang benar)
+    // 1. Cari data lampiran secara manual
     $attachment = \App\Models\TicketAttachment::where('id', $attachmentId)
                     ->where('ticket_id', $ticketId)
                     ->first();
@@ -59,13 +64,13 @@ Route::middleware('auth')->group(function () {
         }
     }
 
-    // 3. Jika ada parameter 'mode=view', tampilkan file langsung di browser (untuk preview index.blade.php)
+    // 3. Jika ada parameter 'mode=view', tampilkan file langsung di browser
     if (request()->query('mode') === 'view') {
         return \Illuminate\Support\Facades\Storage::disk($disk)->response($path);
     }
 
-    // 4. Jika tidak ada parameter (klik tombol unduh di show.blade.php), paksa unduh file
-    return \Illuminate\Support\Facades\Storage::disk($disk)->download($path, $atitsmtachment->original_name);
+    // 4. PERBAIKAN: Menggunakan variabel $attachment yang valid
+    return \Illuminate\Support\Facades\Storage::disk($disk)->download($path, $attachment->original_name);
 })->middleware('auth')->name('tickets.attachment.download');
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');

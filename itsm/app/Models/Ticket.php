@@ -14,12 +14,22 @@ class Ticket extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'ticket_number', 'title', 'description', 'category_id', 'sub_category_id',
+        'ticket_number', 'public_token', 'title', 'description', 'category_id', 'sub_category_id',
         'priority_id', 'requester_id', 'assigned_to', 'assigned_by', 'status',
         'impact', 'urgency', 'type', 'location', 'vessel_name', 'vessel_id',
         'company_id', 'due_date', 'first_response_at', 'resolved_at', 'closed_at',
         'assigned_at', 'resolution_notes', 'sla_breached',
     ];
+
+        // 2. Tambahkan event booted agar token ter-generate otomatis saat pembuatannya
+    protected static function booted(): void
+    {
+        static::creating(function ($ticket) {
+            if (empty($ticket->public_token)) {
+                $ticket->public_token = \Illuminate\Support\Str::random(40);
+            }
+        });
+    }
 
     protected $casts = [
         'due_date' => 'datetime',

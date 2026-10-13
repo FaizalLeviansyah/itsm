@@ -25,3 +25,6 @@ Schedule::command('maintenance:process')->dailyAt('07:00');
 
 // Send daily digest at 8am
 Schedule::command('digest:send')->dailyAt('08:00');
+
+// AFTER (Kode Baru - Sehari sekali jam 9 pagi):
+Schedule::command('itsm:remind-rating')->dailyAt('09:00');

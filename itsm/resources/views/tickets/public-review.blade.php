@@ -1,99 +1,191 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Review & Rating - Ticket #{{ $ticket->id }}</title>
+    <title>IT Support Service Review - #{{ $ticket->ticket_number }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="bg-gray-50 font-sans py-10 px-4">
-    <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden p-6 sm:p-8">
+<body class="bg-gray-50 font-sans antialiased min-h-screen py-6 px-4">
+
+<div class="max-w-2xl mx-auto">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         
         <!-- Header Info -->
-        <div class="flex items-center justify-between border-b pb-4 mb-6">
-            <div>
-                <span class="text-xs font-bold uppercase tracking-wider px-2.5 py-1 bg-brand-50 text-brand-700 rounded-md">
-                    Ticket #{{ $ticket->id }}
-                </span>
-                <h1 class="text-xl font-bold text-gray-900 mt-2">{{ $ticket->title }}</h1>
-            </div>
-            <span class="px-3 py-1 text-xs font-semibold rounded-full 
-                {{ $ticket->status == 'resolved' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' }}">
-                {{ ucfirst($ticket->status) }}
-            </span>
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white text-center md:text-left">
+            <span class="text-xs uppercase tracking-widest font-semibold text-blue-200">Ticket #{{ $ticket->ticket_number }}</span>
+            <h1 class="text-xl md:text-2xl font-bold mt-1 leading-snug">{{ $ticket->title }}</h1>
         </div>
 
-        @if(session('success'))
-            <div class="mb-6 p-4 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm font-medium">
-                <i class="fas fa-check-circle mr-2"></i> {{ session('success') }}
-            </div>
-        @endif
+        <div class="p-5 md:p-8 space-y-6">
 
-        <!-- Detail Hasil Kerja Teknisi -->
-        <div class="mb-6 bg-gray-50 rounded-xl p-5 border border-gray-200">
-            <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Catatan Penyelesaian Teknisi</h3>
-            <p class="text-sm text-gray-800 whitespace-pre-line">{{ $ticket->resolution_notes ?? 'Belum ada catatan penyelesaian.' }}</p>
-            <div class="mt-3 text-xs text-gray-500 flex items-center gap-2">
-                <i class="fas fa-user-shield text-brand-600"></i> Teknisi: 
-                <span class="font-medium text-gray-700">
-                    {{ $ticket->technicians->pluck('name')->join(', ') ?: 'Tim IT Support' }}
-                </span>
-            </div>
-        </div>
+            @if(session('success'))
+                <div class="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm font-semibold flex items-center gap-2">
+                    <i class="fas fa-check-circle text-emerald-600 text-lg"></i> {{ session('success') }}
+                </div>
+            @endif
 
-        @if($ticket->status != 'closed')
-            <!-- Form Aksi: Beri Rating atau Reopen -->
-            <form action="{{ route('ticket.public.submit', $ticket->public_token) }}" method="POST" class="space-y-6">
-                @csrf
-                
-                <div class="border-t pt-6">
-                    <h3 class="text-sm font-bold text-gray-900 mb-3">Beri Penilaian & Tutup Tiket</h3>
-                    
-                    <!-- Bintang Rating -->
-                    <div class="flex items-center gap-2 mb-4">
-                        @for($i = 1; $i <= 5; $i++)
-                            <label class="cursor-pointer text-2xl text-gray-300 hover:text-yellow-400 peer">
-                                <input type="radio" name="rating" value="{{ $i }}" class="peer hidden" required>
-                                <i class="fas fa-star peer-checked:text-yellow-400"></i>
-                            </label>
+            @if(session('error'))
+                <div class="p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl text-sm font-semibold flex items-center gap-2">
+                    <i class="fas fa-exclamation-circle text-red-600 text-lg"></i> {{ session('error') }}
+                </div>
+            @endif
+
+            <!-- 1. Initial Request / Issue Details -->
+            <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 md:p-5">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <i class="fas fa-file-alt text-gray-400"></i> Initial Issue / Request Details
+                </h3>
+                <p class="text-sm text-gray-800 leading-relaxed whitespace-pre-line">{{ $ticket->description ?? 'No detailed description provided.' }}</p>
+            </div>
+
+            <!-- 2. STATUS-BASED DISPLAY -->
+
+            @if($ticket->status === 'closed' && $ticket->rating)
+                <!-- A. CLOSED STATUS WITH RATED RECORD -->
+                <div class="bg-amber-50 border border-amber-200 rounded-xl p-5 text-center">
+                    <div class="text-3xl mb-2 text-amber-400">
+                        @for($i=1; $i<=5; $i++)
+                            {!! $i <= $ticket->rating->rating ? '★' : '<span class="text-gray-200">★</span>' !!}
                         @endfor
+                    </div>
+                    <h3 class="text-base font-bold text-gray-800">Thank You for Your Feedback!</h3>
+                    <p class="text-xs text-gray-500 mt-1">This ticket has been officially closed.</p>
+                    @if($ticket->rating->feedback)
+                        <p class="text-xs text-gray-600 italic mt-2 bg-white/80 p-2.5 rounded border border-amber-100">"{{ $ticket->rating->feedback }}"</p>
+                    @endif
+                </div>
+
+            @elseif($ticket->status === 'resolved')
+                <!-- B. RESOLVED STATUS: RATING FORM & REOPEN OPTION -->
+                <div class="bg-blue-50/60 border border-blue-100 rounded-xl p-4 md:p-5">
+                    <h3 class="text-xs font-bold text-blue-900 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                        <i class="fas fa-check-circle text-blue-600"></i> Your Issue Has Been Resolved
+                    </h3>
+                    <p class="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{{ $ticket->resolution_notes ?? 'Technical work has been completed by our IT team.' }}</p>
+
+                    @php
+                        $techNames = collect();
+                        if ($ticket->assignedTechnicians && $ticket->assignedTechnicians->count() > 0) {
+                            $techNames = $ticket->assignedTechnicians->pluck('name');
+                        } elseif ($ticket->assignee) {
+                            $techNames->push($ticket->assignee->name);
+                        }
+                    @endphp
+                    <div class="mt-3 pt-3 border-t border-blue-100 text-xs text-gray-500 flex items-center gap-2">
+                        <i class="fas fa-user-check text-blue-600"></i> Handled by: 
+                        <span class="font-semibold text-gray-800">{{ $techNames->join(', ') ?: 'IT Support Team' }}</span>
+                    </div>
+                </div>
+
+                <!-- Rating & Feedback Form -->
+                <form action="{{ route('ticket.public.submit', $ticket->public_token) }}" method="POST" id="review-form" class="space-y-6">
+                    @csrf
+                    <input type="hidden" name="action" value="rate">
+
+                    <div class="text-center md:text-left">
+                        <label class="block text-sm font-bold text-gray-800 mb-2">Rate Technician Performance *</label>
+                        <p class="text-xs text-gray-500 mb-3">Click on the stars based on your satisfaction level (1 = Poor, 5 = Excellent):</p>
+                        
+                        <!-- Star Rating UI -->
+                        <div class="flex items-center justify-center md:justify-start gap-2" id="star-container">
+                            @for($i = 1; $i <= 5; $i++)
+                                <button type="button" onclick="setPublicRating({{ $i }})" 
+                                        class="star-btn text-4xl text-gray-300 hover:text-amber-400 focus:outline-none transition-transform hover:scale-110 cursor-pointer" 
+                                        data-value="{{ $i }}">★</button>
+                            @endfor
+                        </div>
+                        <input type="hidden" name="rating" id="public-rating-value" required>
+                        <p id="rating-text" class="text-xs font-semibold text-amber-600 mt-2 min-h-[16px]"></p>
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Komentar / Ulasan Layanan</label>
-                        <textarea name="comment" rows="3" class="w-full border border-gray-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500" placeholder="Tuliskan ulasan atau feedback Anda terhadap pelayanan teknisi..."></textarea>
+                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Additional Feedback / Comments (Optional)</label>
+                        <textarea name="feedback" rows="3" class="w-full border border-gray-200 rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Write your comments about our technical service..."></textarea>
                     </div>
 
-                    <button type="submit" name="action" value="rate" class="mt-4 w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 px-4 rounded-xl text-sm transition shadow">
-                        <i class="fas fa-paper-plane mr-2"></i> Kirim Rating & Selesaikan (Close Ticket)
+                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl text-sm transition shadow-md hover:shadow-lg flex items-center justify-center gap-2">
+                        <i class="fas fa-paper-plane"></i> Submit Rating & Close Ticket
                     </button>
+                </form>
+
+                <div class="relative flex py-2 items-center">
+                    <div class="flex-grow border-t border-gray-200"></div>
+                    <span class="flex-shrink mx-4 text-xs font-semibold text-gray-400 uppercase">Or</span>
+                    <div class="flex-grow border-t border-gray-200"></div>
                 </div>
 
-                <!-- Opsi Jika Belum Selesai (Reopen) -->
-                <div class="border-t pt-6">
+                <!-- Reopen Accordion Form -->
+                <div class="border border-red-200 rounded-xl bg-red-50/40 p-4">
                     <details class="group">
-                        <summary class="text-xs font-semibold text-red-600 cursor-pointer hover:underline">
-                            <i class="fas fa-exclamation-triangle mr-1"></i> Kendala belum tuntas? Klik di sini untuk Reopen Tiket
+                        <summary class="flex justify-between items-center font-bold text-xs text-red-700 cursor-pointer list-none">
+                            <span class="flex items-center gap-2"><i class="fas fa-exclamation-triangle"></i> Issue Not Resolved Yet? Click here to Reopen</span>
+                            <span class="transition group-open:rotate-180"><i class="fas fa-chevron-down"></i></span>
                         </summary>
-                        <div class="mt-3 space-y-3">
+                        <form action="{{ route('ticket.public.submit', $ticket->public_token) }}" method="POST" class="mt-4 space-y-3">
+                            @csrf
+                            <input type="hidden" name="action" value="reopen">
                             <div>
-                                <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Alasan Membuka Kembali Tiket</label>
-                                <textarea name="reopen_reason" rows="2" class="w-full border border-red-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-red-500" placeholder="Jelaskan kendala apa yang masih terjadi..."></textarea>
+                                <label class="block text-xs font-medium text-gray-700 mb-1">Please explain what is still not working *</label>
+                                <textarea name="reason" rows="2" required class="w-full border border-red-200 rounded-lg p-2.5 text-xs bg-white focus:ring-2 focus:ring-red-500" placeholder="e.g., Printer is still unresponsive when printing..."></textarea>
                             </div>
-                            <button type="submit" name="action" value="reopen" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 px-4 rounded-xl text-sm transition">
-                                Reopen Ticket
+                            <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-lg text-xs transition">
+                                Request Reopen Ticket
                             </button>
-                        </div>
+                        </form>
                     </details>
                 </div>
-            </form>
-        @else
-            <div class="text-center py-4 bg-green-50 rounded-xl text-green-800 text-sm font-medium">
-                <i class="fas fa-lock mr-1"></i> Tiket ini telah selesai dan ditutup (Closed). Terima kasih atas partisipasi Anda.
-            </div>
-        @endif
 
+            @else
+                <!-- C. TICKET IN PROGRESS / NOT RESOLVED YET -->
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-6 text-center space-y-3">
+                    <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto text-xl animate-pulse">
+                        <i class="fas fa-tools"></i>
+                    </div>
+                    <h3 class="text-base font-bold text-blue-900">Ticket Currently In Progress</h3>
+                    <p class="text-xs text-gray-600 leading-relaxed max-w-md mx-auto">
+                        Your ticket status is currently <span class="font-bold uppercase text-blue-700">{{ str_replace('_', ' ', $ticket->status) }}</span>. The rating form will automatically become active once our technician resolves the issue.
+                    </p>
+                    <div class="inline-block bg-white border border-blue-200 rounded-lg px-4 py-2 text-xs font-semibold text-gray-700">
+                        Current Status: <span class="text-blue-600 font-bold uppercase">{{ $ticket->status }}</span>
+                    </div>
+                </div>
+            @endif
+
+        </div>
     </div>
+</div>
+
+<script>
+function setPublicRating(value) {
+    document.getElementById('public-rating-value').value = value;
+    const stars = document.querySelectorAll('.star-btn');
+    const label = document.getElementById('rating-text');
+    
+    const labels = {
+        1: '1/5 - Poor',
+        2: '2/5 - Unsatisfactory',
+        3: '3/5 - Average',
+        4: '4/5 - Good & Fast',
+        5: '5/5 - Excellent'
+    };
+
+    stars.forEach((star, index) => {
+        if (index < value) {
+            star.classList.remove('text-gray-300');
+            star.classList.add('text-amber-400');
+        } else {
+            star.classList.remove('text-amber-400');
+            star.classList.add('text-gray-300');
+        }
+    });
+
+    if (label) {
+        label.innerText = labels[value] || '';
+    }
+}
+</script>
+
 </body>
 </html>

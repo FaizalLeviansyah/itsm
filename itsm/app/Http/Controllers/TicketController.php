@@ -502,8 +502,6 @@ class TicketController extends Controller
         $oldStatus = $ticket->status;
         $data = ['status' => $request->status];
 
-        // --- TAMBAHKAN KODE INI UNTUK UPDATE TABEL APPROVAL ---
-        // Jika tiket sedang pending dan status diubah jadi open/cancelled via Banner Approval
         if ($oldStatus === 'pending' && $ticket->approvals()->where('status', 'pending')->exists()) {
             $approvalStatus = $request->status === 'cancelled' ? 'rejected' : 'approved';
             
@@ -511,27 +509,79 @@ class TicketController extends Controller
                 'status' => $approvalStatus,
                 'approved_by' => Auth::id(),
                 'approved_at' => now(),
-                'notes' => $request->resolution_notes, // Catatan alasan reject/approve
+                'notes' => $request->resolution_notes,
             ]);
         }
 
-        // Kirim Notifikasi WhatsApp & Email ke Requester dengan Tautan Publik Rating
-        if ($request->status === 'resolved' && $ticket->requester) {
-            try {
-                $publicLink = route('ticket.public.review', $ticket->public_token);
-                
-                $waMessage  = "*[IT HELPDESK - TICKET RESOLVED]*\n\n";
-                $waMessage .= "Halo *{$ticket->requester->name}*,\n";
-                $waMessage .= "Tiket Anda *{$ticket->ticket_number}* ({$ticket->title}) telah diselesaikan oleh teknisi.\n\n";
-                $waMessage .= "Silakan tinjau hasil kerja teknisi dan berikan rating/ulasan melalui tautan berikut (tanpa login):\n";
-                $waMessage .= "👉 {$publicLink}\n\n";
-                $waMessage .= "_Terima kasih_";
+        // JIKA TEKNISI MENGUBAH STATUS DARI RESOLVED KEMBALI KE PROGRESS/OPEN (BATAL RESOLVED)
+        if ($oldStatus === 'resolved' && in_array($request->status, ['in_progress', 'open', 'assigned'])) {
+            $ticket->load(['requester', 'assignee', 'assignedTechnicians']);
+            $requesterPhone = $ticket->requester?->phone;
 
-                if (!empty($ticket->requester->phone)) {
-                    $this->waService->sendMessage($ticket->requester->phone, $waMessage);
+            if ($requesterPhone) {
+                try {
+                    $techs = $ticket->assignedTechnicians->pluck('name')->join(', ') ?: ($ticket->assignee?->name ?? 'Tim IT');
+
+                    $waMsg  = "⚠️ *[TICKET STATUS UPDATE - REOPENED BY TECH]* ⚠️\n\n";
+                    $waMsg .= "Dear *{$ticket->requester->name}*,\n\n";
+                    $waMsg .= "Please **DISREGARD** the previous rating link. Your ticket *{$ticket->ticket_number}* (*{$ticket->title}*) has been moved back from *Resolved* to *" . strtoupper(str_replace('_', ' ', $request->status)) . "* by *{$techs}* for further adjustments/fixes.\n\n";
+                    
+                    if ($request->filled('resolution_notes')) {
+                        $waMsg .= "📝 *Technician Note:*\n";
+                        $waMsg .= "_{$request->resolution_notes}_\n\n";
+                    }
+                    
+                    $waMsg .= "Our team is still working on your request. We will notify you once it is truly completed.\n\n";
+                    $waMsg .= "_Thank you for your understanding!_";
+
+                    $this->waService->sendMessage($requesterPhone, $waMsg);
+                } catch (\Exception $e) {
+                    Log::error('Failed to send status revert WA notification: ' . $e->getMessage());
                 }
-            } catch (\Exception $e) {
-                Log::error('Gagal mengirim WA Public Review: ' . $e->getMessage());
+            }
+        }
+
+        // =========================================================================
+        // PERBAIKAN UTAMA: KIRIM NOTIFIKASI WA RESOLVED LANGSUNG KE NOMOR REQUESTER
+        // =========================================================================
+        if ($request->status === 'resolved') {
+            if (empty(trim($request->resolution_notes))) {
+                return back()->with('error', 'Wajib memberikan catatan/komentar solusi sebelum menyelesaikan (Resolve) tiket.');
+            }
+
+            $data['resolved_at'] = now();
+            $data['resolution_notes'] = $request->resolution_notes;
+
+            $ticket->load(['requester', 'assignee', 'assignedTechnicians']);
+            $requesterPhone = $ticket->requester?->phone;
+
+            if ($requesterPhone) {
+                try {
+                    $publicLink = route('ticket.public.review', $ticket->public_token);
+                    
+                    // Format Nama Teknisi yang Mengerjakan
+                    $techs = $ticket->assignedTechnicians->pluck('name')->join(', ') ?: ($ticket->assignee?->name ?? 'Tim IT');
+
+                    // --- TEKS BERPENEKANAN PSIKOLOGIS & PENUH PERINDAH BOLD ---
+                    $waMessage  = "⚠️ *[YOUR PROBLEM SOLVED - TICKET RESOLVED - RATING REQUIRED]* ⚠️\n\n";
+                    $waMessage .= "Dear *{$ticket->requester->name}*,\n\n";
+                    $waMessage .= "Your ticket *{$ticket->ticket_number}* (*{$ticket->title}*) has been **RESOLVED** by *{$techs}*.\n\n";
+                    $waMessage .= "📋 *Initial Issue:*\n";
+                    $waMessage .= "_{$ticket->description}_\n\n";
+                    $waMessage .= "📝 *Resolution Notes:*\n";
+                    $waMessage .= "_{$request->resolution_notes}_\n\n";
+                    $waMessage .= "⭐⭐ *PLEASE RATE OUR SERVICE!* ⭐⭐\n";
+                    $waMessage .= "Your feedback is **ESSENTIAL** to evaluate our IT Service performance and formally **CLOSE THIS TICKET**.\n\n";
+                    $waMessage .= "👇 **CLICK THE LINK BELOW TO PROVIDE YOUR RATING (NO LOGIN REQUIRED):**\n";
+                    $waMessage .= "👉 {$publicLink}\n\n";
+                    $waMessage .= "*If the issue is NOT completely resolved, you can choose to REOPEN the ticket via the link above.*\n\n";
+                    $waMessage .= "_Thank you for your cooperation!_";
+
+                    // Kirim langsung ke HP Requester
+                    $this->waService->sendMessage($requesterPhone, $waMessage);
+                } catch (\Exception $e) {
+                    Log::error('Gagal mengirim WA Public Review ke Requester: ' . $e->getMessage());
+                }
             }
         } elseif ($request->status === 'closed') {
             $data['closed_at'] = now();
@@ -553,9 +603,9 @@ class TicketController extends Controller
         $ticket->load(['assignee', 'requester', 'priority']);
 
         $this->notifyAdminViaWa($ticket, 'Status Changed to ' . strtoupper($request->status), $request->resolution_notes ?? '-');
-        if ($request->status === 'resolved') {
-            $this->waService->notifyTicketResolved($ticket);
-        }
+        // if ($request->status === 'resolved') {
+        //     $this->waService->notifyTicketResolved($ticket);
+        // }
 
         $this->sendStatusUpdateNotifications($ticket, $oldStatus, $request->status);
 

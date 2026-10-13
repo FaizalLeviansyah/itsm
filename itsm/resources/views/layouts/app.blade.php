@@ -241,12 +241,14 @@
                 </div>
 
                 <div class="flex items-center gap-3">
+                    @auth
                     <a href="{{ route('notifications.index') }}" class="relative w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-100 transition text-gray-500">
                         <i class="fas fa-bell text-[15px]"></i>
                         @if(Auth::user()->unreadNotifications->count() > 0)
                         <span class="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse">{{ Auth::user()->unreadNotifications->count() > 9 ? '9+' : Auth::user()->unreadNotifications->count() }}</span>
                         @endif
                     </a>
+                    @endauth
                     <a href="{{ route('profile.show') }}" class="flex items-center gap-3 pl-3 border-l border-gray-200 ml-1 hover:opacity-80 transition">
                         <div class="text-right hidden sm:block">
                             <p class="text-sm font-semibold text-gray-800 leading-none">{{ Auth::user()->name }}</p>

@@ -836,4 +836,58 @@ class TicketController extends Controller
 
         return view('tickets.index', compact('tickets', 'priorities', 'categories'))->with('isMyTickets', true);
     }
+
+    public function updatePriority(Request $request, Ticket $ticket)
+    {
+        // 1. Pastikan hanya Admin atau Technician yang boleh merubah prioritas/impact
+        if (!in_array(Auth::user()->role, ['admin', 'technician'])) {
+            return back()->with('error', 'Akses ditolak: Hanya Admin dan Teknisi yang diizinkan menyesuaikan Prioritas & Impact.');
+        }
+
+        $request->validate([
+            'priority_id' => 'required|exists:priorities,id',
+            'impact'      => 'nullable|string|in:low,medium,high,critical',
+            'urgency'     => 'nullable|string|in:low,medium,high,critical',
+            'reason'      => 'nullable|string|max:255',
+        ]);
+
+        $oldPriority = $ticket->priority->name ?? 'None';
+        $oldImpact   = $ticket->impact ?? 'low';
+
+        $newPriority = Priority::findOrFail($request->priority_id);
+
+        // 2. Hitung ulang SLA Due Date berdasarkan SLA jam dari prioritas baru
+        $newDueDate = $this->slaCalculator->calculateDueDate($ticket->created_at, $newPriority->sla_hours ?? 24);
+
+        // 3. Update data tiket
+        $ticket->update([
+            'priority_id' => $newPriority->id,
+            'impact'      => $request->impact ?? $ticket->impact,
+            'urgency'     => $request->urgency ?? $ticket->urgency,
+            'due_date'    => $newDueDate,
+        ]);
+
+        // 4. Catat riwayat perubahan ke TicketHistory
+        $note = "Prioritas diubah dari {$oldPriority} ke {$newPriority->name}";
+        if ($request->impact && $request->impact !== $oldImpact) {
+            $note .= " | Impact diubah dari " . ucfirst($oldImpact) . " ke " . ucfirst($request->impact);
+        }
+        if ($request->filled('reason')) {
+            $note .= " (Alasan: " . $request->reason . ")";
+        }
+
+        TicketHistory::create([
+            'ticket_id' => $ticket->id,
+            'user_id'   => Auth::id(),
+            'field'     => 'priority_id',
+            'old_value' => $oldPriority,
+            'new_value' => $newPriority->name,
+            'note'      => $note,
+        ]);
+
+        // 5. Kirim Notifikasi WA ke Admin/Teknisi
+        $this->notifyAdminViaWa($ticket, 'Priority Adjusted by Admin/Tech', $note);
+
+        return back()->with('success', "Prioritas tiket berhasil disesuaikan menjadi {$newPriority->name} dan target SLA Due Date telah diperbarui.");
+    }
 }

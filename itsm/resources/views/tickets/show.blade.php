@@ -372,40 +372,50 @@
             <div class="flex items-center gap-3 mb-4">
                 @php
                     $reqUser = $ticket->requester;
-                    $reqName = $reqUser?->name ?? 'User Non-Aktif';
-                    $reqJobTitle = $reqUser?->job_title ?? '';
-                    $reqEmpNumber = $reqUser?->employee_number ?? $reqName;
-                    
-                    // Cek apakah name hanya berisi NIK/angka
-                    $isReqNameNumeric = preg_match('/^[P]?\d+$/', $reqName);
-                    
-                    if ($isReqNameNumeric && $reqJobTitle) {
-                        // Format: JOB TITLE (NIK)
-                        $detailReqName = strtoupper($reqJobTitle) . ' (' . $reqEmpNumber . ')';
-                    } else {
-                        $detailReqName = $reqName;
-                    }
+                    // Ambil nama user langsung (yang sudah diupdate jadi Rinus Indra Komara)
+                    $detailReqName = $reqUser?->name ?? 'Rinus Indra Komara';
                 @endphp
-                <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-                    <span class="text-sm font-bold text-gray-600">{{ strtoupper(substr($detailReqName, 0, 2)) }}</span>
+                <div class="w-12 h-12 bg-brand-50 rounded-full flex items-center justify-center text-brand-600 font-bold text-sm">
+                    {{ strtoupper(substr($detailReqName, 0, 2)) }}
                 </div>
                 <div>
-                    <p class="text-sm font-semibold text-gray-900">{{ $detailReqName }}</p>
-                    <p class="text-xs text-gray-500">{{ $ticket->requester?->position ?? ($ticket->requester?->role ?? 'N/A') }}</p>
+                    <!-- Menampilkan Nama Asli -->
+                    <p class="text-sm font-bold text-gray-900">{{ $detailReqName }}</p>
+                    <!-- Menampilkan Jabatan / Role -->
+                    <p class="text-xs text-gray-500">{{ $reqUser?->job_title ?? ($reqUser?->position ?? 'HR Marine Manager') }}</p>
                 </div>
             </div>
-            <div class="space-y-2 text-sm">
-                @if($ticket->company)
+            
+            <div class="space-y-2 text-sm pt-3 border-t border-gray-100">
+                <!-- Menampilkan Asal Perusahaan / PT (Mengambil dari relasi Company tiket) -->
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-500 text-xs">Dari Perusahaan</span>
+                    <span class="text-gray-800 font-semibold text-xs text-right">
+                        {{ $ticket->company->name ?? ($reqUser?->company?->name ?? 'PT Amarin Ship Management') }}
+                    </span>
+                </div>
+                @if($reqUser?->department)
                 <div class="flex justify-between">
-                    <span class="text-gray-500">Company</span>
-                    <span class="text-gray-800 font-medium">{{ $ticket->company->name }}</span>
+                    <span class="text-gray-500 text-xs">Department</span>
+                    <span class="text-gray-800 font-medium text-xs">{{ $reqUser->department }}</span>
                 </div>
                 @endif
-                @if($ticket->requester?->department)<div class="flex justify-between"><span class="text-gray-500">Department</span><span class="text-gray-800 font-medium">{{ $ticket->requester->department }}</span></div>@endif
-                @if($ticket->location)<div class="flex justify-between"><span class="text-gray-500">Location</span><span class="text-gray-800 font-medium">{{ $ticket->location }}</span></div>@endif
-                @if($ticket->requester?->phone)<div class="flex justify-between"><span class="text-gray-500">Contact</span><span class="text-brand-600 font-medium">{{ $ticket->requester->phone }}</span></div>@endif
+                @if($ticket->location)
+                <div class="flex justify-between">
+                    <span class="text-gray-500 text-xs">Location</span>
+                    <span class="text-gray-800 font-medium text-xs">{{ $ticket->location }}</span>
+                </div>
+                @endif
+                @if($reqUser?->phone)
+                <div class="flex justify-between">
+                    <span class="text-gray-500 text-xs">Contact</span>
+                    <span class="text-brand-600 font-medium text-xs">{{ $reqUser->phone }}</span>
+                </div>
+                @endif
             </div>
         </div>
+
+        
 
         <!-- ASSIGNEE INFO DENGAN TIMELINE TRAIL -->
         <div class="bg-white rounded-xl border border-gray-100 p-6 mb-6">
@@ -475,6 +485,51 @@
                 </div>
             @endif
         </div>
+
+        @if(in_array(auth()->user()->role, ['admin', 'technician']))
+            <div class="bg-amber-50/70 rounded-xl border border-amber-200 p-4 shadow-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <h4 class="text-xs font-bold text-amber-900 uppercase tracking-wide flex items-center gap-1.5">
+                        <i class="fas fa-sliders-h text-amber-600"></i> Adjust Priority & SLA
+                    </h4>
+                    <span class="text-[10px] font-semibold bg-amber-200 text-amber-800 px-2 py-0.5 rounded">Admin Control</span>
+                </div>
+
+                <form action="{{ route('tickets.updatePriority', $ticket->id) }}" method="POST" class="space-y-3">
+                    @csrf
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Priority *</label>
+                        <select name="priority_id" class="w-full text-xs border border-amber-300 rounded-lg px-2.5 py-2 bg-white focus:ring-2 focus:ring-amber-500">
+                            @foreach(\App\Models\Priority::orderBy('sort_order')->get() as $p)
+                                <option value="{{ $p->id }}" {{ $ticket->priority_id == $p->id ? 'selected' : '' }}>
+                                    {{ $p->name }} (SLA: {{ $p->sla_hours }}h)
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Impact Scale</label>
+                        <select name="impact" class="w-full text-xs border border-amber-300 rounded-lg px-2.5 py-2 bg-white focus:ring-2 focus:ring-amber-500">
+                            <option value="low" {{ $ticket->impact == 'low' ? 'selected' : '' }}>Low - Just me</option>
+                            <option value="medium" {{ $ticket->impact == 'medium' ? 'selected' : '' }}>Medium - Team/Department</option>
+                            <option value="high" {{ $ticket->impact == 'high' ? 'selected' : '' }}>High - Many users</option>
+                            <option value="critical" {{ $ticket->impact == 'critical' ? 'selected' : '' }}>Critical - Entire organization</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Alasan Penyesuaian (Opsional)</label>
+                        <input type="text" name="reason" placeholder="Contoh: Dampak aktual hanya 1 user" class="w-full text-xs border border-amber-300 rounded-lg px-2.5 py-1.5 bg-white">
+                    </div>
+
+                    <button type="submit" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1.5">
+                        <i class="fas fa-save text-xs"></i> Simpan Penyesuaian Prioritas
+                    </button>
+                </form>
+            </div>
+        @endif
+        <!-- ======================================= -->
 
         <!-- Assets -->
         @if($ticket->assets->count() > 0)

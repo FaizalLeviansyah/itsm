@@ -43,37 +43,45 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout')->midd
 // Protected Routes
 Route::middleware('auth')->group(function () {
 
- Route::get('/tickets/{ticketId}/attachments/{attachmentId}/download', function($ticketId, $attachmentId) {
-    // 1. Cari data lampiran secara manual
-    $attachment = \App\Models\TicketAttachment::where('id', $attachmentId)
-                    ->where('ticket_id', $ticketId)
-                    ->first();
+    Route::get('/tickets/{ticketId}/attachments/{attachmentId}/download', function($ticketId, $attachmentId) {
+        // 1. Cari data lampiran secara manual
+        $attachment = \App\Models\TicketAttachment::where('id', $attachmentId)
+                        ->where('ticket_id', $ticketId)
+                        ->first();
 
-    if (! $attachment) {
-        abort(404, 'Berkas lampiran tidak ditemukan.');
-    }
-
-    // 2. Deteksi lokasi file
-    $path = $attachment->path;
-    $disk = \Illuminate\Support\Facades\Storage::disk('local')->exists($path) ? 'local' : 'public';
-
-    if (! \Illuminate\Support\Facades\Storage::disk($disk)->exists($path)) {
-        $path = str_replace('storage/', '', $path);
-        if (! \Illuminate\Support\Facades\Storage::disk($disk)->exists($path)) {
-            abort(404, 'File fisik tidak ditemukan di server.');
+        if (! $attachment) {
+            abort(404, 'Berkas lampiran tidak ditemukan.');
         }
-    }
 
-    // 3. Jika ada parameter 'mode=view', tampilkan file langsung di browser
-    if (request()->query('mode') === 'view') {
-        return \Illuminate\Support\Facades\Storage::disk($disk)->response($path);
-    }
+        // 2. Deteksi lokasi file
+        $path = $attachment->path;
+        $disk = \Illuminate\Support\Facades\Storage::disk('local')->exists($path) ? 'local' : 'public';
 
-    // 4. PERBAIKAN: Menggunakan variabel $attachment yang valid
-    return \Illuminate\Support\Facades\Storage::disk($disk)->download($path, $attachment->original_name);
-})->middleware('auth')->name('tickets.attachment.download');
+        if (! \Illuminate\Support\Facades\Storage::disk($disk)->exists($path)) {
+            $path = str_replace('storage/', '', $path);
+            if (! \Illuminate\Support\Facades\Storage::disk($disk)->exists($path)) {
+                abort(404, 'File fisik tidak ditemukan di server.');
+            }
+        }
+
+        // 3. Jika ada parameter 'mode=view', tampilkan file langsung di browser
+        if (request()->query('mode') === 'view') {
+            return \Illuminate\Support\Facades\Storage::disk($disk)->response($path);
+        }
+
+        // 4. Download file
+        return \Illuminate\Support\Facades\Storage::disk($disk)->download($path, $attachment->original_name);
+    })->middleware('auth')->name('tickets.attachment.download');
+
+    // ==========================================
+    // PINDAHKAN RUTE INI KE SINI (DI LUAR CLOSURE ATTACHMENT)
+    // ==========================================
+    Route::post('/tickets/{ticket}/priority', [TicketController::class, 'updatePriority'])->name('tickets.updatePriority');
+    // ==========================================
+
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    
 
     // Global Search
     Route::get('/search', [SearchController::class, 'index'])->name('search');

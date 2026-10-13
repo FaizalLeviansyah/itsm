@@ -5,55 +5,40 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use App\Models\User;
-use Illuminate\Support\Str;
+use App\Models\Employee;
 
 class SyncEmployees extends Command
 {
     protected $signature = 'sync:employees';
-    protected $description = 'Sync employees and vessels from Master API to local ITSM database';
+    protected $description = 'Sync employees from local Employee master database to local ITSM users table';
 
     public function handle()
     {
-        $this->info('Starting employee synchronization...');
+        $this->info('Starting employee synchronization from local Employee model...');
 
-        $apiUrl = env('MASTER_EMPLOYEE_API_URL', 'http://api.amarin.biz.id/api/v1/data/db_master_amarin_original/tbl_employee');
-        $apiKey = env('MASTER_API_KEY', 'AZX09KWEGRKT8hiwBHoliBOOI6zbRg5X');
+        try {
+            // Tarik data langsung dari model Employee (Bukan HTTP API eksternal yang terkena 403 Forbidden)
+            $employees = Employee::where('is_active', 1)
+                ->whereNotNull('email_work')
+                ->where('email_work', '!=', '')
+                ->get();
 
-        $page = 1;
-        $perPage = 100;
-        $totalEmployeeSynced = 0;
-
-        // ==========================================
-        // 1. SINKRONISASI PEGAWAI (EMPLOYEES)
-        // ==========================================
-        do {
-            $response = Http::withHeaders([
-                'X-API-Key' => $apiKey,
-                'Accept' => 'application/json',
-            ])->get("$apiUrl?page=$page&per_page=$perPage");
-
-            if (!$response->successful()) {
-                $this->error("Failed to fetch employee data from API on page {$page}. Status: " . $response->status() . " | Body: " . $response->body());
-                break;
-            }
-
-            $result = $response->json();
-            $employees = $result['data'] ?? [];
-
-            if (empty($employees)) {
-                break;
-            }
+            $totalEmployeeSynced = 0;
 
             foreach ($employees as $emp) {
-                $email = $emp['email_work'] ?? null;
+                $email = $emp->email_work;
                 if (!$email) continue;
 
-                // Tambahkan $emp['full_name'] di urutan pertama agar mendeteksi nama lengkap dari API Master Employee dengan tepat
-                $name = $emp['full_name'] ?? $emp['name'] ?? $emp['employee_name'] ?? $emp['fullname'] ?? ucwords(str_replace(['.', '_'], ' ', explode('@', $email)[0]));
+                // Pastikan full_name dibaca pertama agar "Dwi Riyanto" muncul, bukan "Crewingmanager"
+                $name = $emp->full_name 
+                    ?? $emp->name 
+                    ?? $emp->employee_name 
+                    ?? $emp->fullname 
+                    ?? ucwords(str_replace(['.', '_'], ' ', explode('@', $email)[0]));
 
                 $lowerEmail = strtolower(trim($email));
-                $rawTitle = $emp['job_title'] ?? $emp['position'] ?? '';
-                $rawDept  = $emp['department'] ?? $emp['directorate'] ?? '';
+                $rawTitle = $emp->job_title ?? $emp->position ?? '';
+                $rawDept  = $emp->department ?? $emp->directorate ?? '';
                 
                 $titleLower = strtolower(trim($rawTitle));
                 $deptLower  = strtolower(trim($rawDept));
@@ -92,70 +77,79 @@ class SyncEmployees extends Command
                 }
 
                 User::updateOrCreate(
-                    ['email' => $email],
+                    ['email' => strtolower(trim($email))],
                     [
-                        'name' => $name,
-                        'employee_number' => $emp['employee_number'] ?? null,
-                        'password' => $emp['password'] ?? bcrypt('defaultpassword'),
+                        'name' => trim($name),
+                        'employee_number' => $emp->employee_number ?? null,
+                        'password' => $emp->password ?? bcrypt('defaultpassword'),
                         'role' => $role,
-                        'department' => $rawDept ?: null,      // Perbaikan: Simpan Departemen
-                        'job_title' => $rawTitle ?: null,      // Perbaikan: Simpan Job Title
-                        'position' => $rawTitle ?: null,       // Perbaikan: Simpan Posisi
-                        'phone' => $emp['phone'] ?? null,
+                        'department' => $rawDept ?: null,
+                        'job_title' => $rawTitle ?: null,
+                        'position' => $rawTitle ?: null,
+                        'phone' => $emp->phone ?? null,
+                        'company_id' => $emp->company_id ?? null,
+                        'is_active' => true,
                         'source' => 'employee'
                     ]
                 );
                 $totalEmployeeSynced++;
             }
-            $page++;
-        } while (count($employees) == $perPage);
 
-        // Paksa update untuk memastikan it.support tidak meleset
-        User::where('email', 'it.support@amarinshipmgmt.com')->update(['role' => 'technician']);
+            // Paksa update untuk memastikan it.support tidak meleset
+            User::where('email', 'it.support@amarinshipmgmt.com')->update(['role' => 'technician']);
 
+            $this->info("Successfully synchronized {$totalEmployeeSynced} employees.");
+
+        } catch (\Exception $e) {
+            $this->error("Employee sync error: " . $e->getMessage());
+        }
 
         // ==========================================
         // 2. SINKRONISASI KAPAL (VESSELS)
         // ==========================================
         $this->info('Starting vessel synchronization...');
         
+        $apiKey = env('MASTER_VESSEL_API_KEY', env('MASTER_API_KEY', 'OJABxyAuodPWhds3S0YsPlbu40DTRAwe'));
         $vesselApiUrl = env('MASTER_VESSEL_API_URL', 'http://api.amarin.biz.id/api/v1/data/db_master_ship/vessel');
         $totalVesselSynced = 0;
 
-        $vesselResponse = Http::withHeaders([
-            'X-API-Key' => $apiKey,
-            'Accept' => 'application/json',
-        ])->get("$vesselApiUrl?page=1&per_page=500"); // Asumsi total kapal di bawah 500
+        try {
+            $vesselResponse = Http::withHeaders([
+                'X-API-Key' => $apiKey,
+                'Accept' => 'application/json',
+            ])->get("$vesselApiUrl?page=1&per_page=500");
 
-        if ($vesselResponse->successful()) {
-            $vessels = $vesselResponse->json()['data'] ?? [];
-            
-            foreach ($vessels as $vessel) {
-                $vesselName = $vessel['vessel_name'] ?? $vessel['name'] ?? null;
-                if (!$vesselName) continue;
+            if ($vesselResponse->successful()) {
+                $vessels = $vesselResponse->json()['data'] ?? [];
+                
+                foreach ($vessels as $vessel) {
+                    $vesselName = $vessel['vessel_name'] ?? $vessel['name'] ?? null;
+                    if (!$vesselName) continue;
 
-                // Gunakan email API, jika kosong buat format: mtqueencentury@vessel.amarin.biz.id
-                $email = $vessel['login_email'] ?? strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $vesselName)) . '@vessel.amarin.biz.id';
+                    $email = $vessel['login_email'] ?? strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $vesselName)) . '@vessel.amarin.biz.id';
 
-                User::updateOrCreate(
-                    ['email' => $email],
-                    [
-                        'name' => $vesselName,
-                        'password' => $vessel['login_password'] ?? $vessel['password'] ?? bcrypt('vesselpassword'),
-                        'role' => 'user',
-                        'department' => 'Vessel', // Semua kapal akan masuk departemen 'Vessel'
-                        'job_title' => 'Vessel',
-                        'position' => 'Vessel - ' . $vesselName,
-                        'source' => 'vessel_api',
-                        'source_id' => $vessel['id'] ?? null,
-                    ]
-                );
-                $totalVesselSynced++;
+                    User::updateOrCreate(
+                        ['email' => strtolower(trim($email))],
+                        [
+                            'name' => $vesselName,
+                            'password' => $vessel['login_password'] ?? $vessel['password'] ?? bcrypt('vesselpassword'),
+                            'role' => 'user',
+                            'department' => 'Vessel',
+                            'job_title' => 'Vessel',
+                            'position' => 'Vessel - ' . $vesselName,
+                            'source' => 'vessel_api',
+                            'source_id' => $vessel['id'] ?? null,
+                            'is_active' => true,
+                        ]
+                    );
+                    $totalVesselSynced++;
+                }
+                $this->info("Successfully synchronized {$totalVesselSynced} vessels.");
+            } else {
+                $this->error("Failed to fetch vessel data from API. Status: " . $vesselResponse->status());
             }
-        } else {
-            $this->error("Failed to fetch vessel data from API.");
+        } catch (\Exception $e) {
+            $this->error("Vessel sync error: " . $e->getMessage());
         }
-
-        $this->info("Successfully synchronized {$totalEmployeeSynced} employees and {$totalVesselSynced} vessels.");
     }
 }

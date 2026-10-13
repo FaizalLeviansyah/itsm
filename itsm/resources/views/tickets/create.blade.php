@@ -42,23 +42,18 @@
                                     $isVessel = str_contains(strtolower($u->name), 'mt ') || str_contains(strtolower($u->email), 'vessel') || str_contains(strtolower($u->position ?? ''), 'vessel');
                                     $locationType = $isVessel ? 'vessel' : 'office';
                                     
-                                    $displayName = $u->name;
                                     $jobTitle = $u->job_title ?? ($u->position ?? '');
-                                    $empNumber = $u->employee_number ?? '';
-                                    $emailWork = $u->email ?? '';
                                     $companyName = $u->company->name ?? 'No Company';
                                     
-                                    $isNameNumeric = preg_match('/^[P]?\d+$/', $u->name);
-                                    
-                                    // Format Teks Dropdown yang sangat lengkap: Nama / Jabatan / Email / Perusahaan
-                                    if ($isNameNumeric && $jobTitle) {
-                                        $optionText = strtoupper($jobTitle) . ' (' . $empNumber . ') | ' . $emailWork . ' | ' . $companyName;
-                                    } else {
-                                        $optionText = $displayName;
-                                        if ($jobTitle) { $optionText .= ' - ' . $jobTitle; }
-                                        if ($emailWork) { $optionText .= ' (' . $emailWork . ')'; }
-                                        $optionText .= ' [' . $companyName . ']';
+                                    // Tampilkan Full Name persis dari database
+                                    $optionText = $u->name;
+                                    if ($jobTitle) { 
+                                        $optionText .= ' - ' . $jobTitle; 
                                     }
+                                    if ($u->email) { 
+                                        $optionText .= ' (' . $u->email . ')'; 
+                                    }
+                                    $optionText .= ' [' . $companyName . ']';
                                 @endphp
                                 <option value="{{ $u->id }}" data-location="{{ $locationType }}" {{ old('requester_id') == $u->id ? 'selected' : '' }}>
                                     {{ $optionText }}

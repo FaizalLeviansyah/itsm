@@ -76,11 +76,11 @@ class SsoCallbackController extends Controller
                     }
 
                     $user = User::create([
-                        'name' => $employee->full_name ?: $payload['email'],
+                        'name' => $employee->full_name ?? ($payload['name'] ?? $payload['email']), // Ambil full_name secara mutlak dari master employee
                         'email' => $payload['email'],
                         'password' => Hash::make(\Illuminate\Support\Str::random(32)),
                         'phone' => $employee->phone ?? null,
-                        'department' => $employee->directorate ?? null,
+                        'department' => $employee->directorate ?? $employee->department ?? null,
                         'position' => $employee->job_title ?? null,
                         'source' => 'employee',
                         'source_id' => $employee->employee_id ?? null,

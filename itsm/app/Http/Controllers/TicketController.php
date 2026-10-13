@@ -90,13 +90,14 @@ class TicketController extends Controller
     public function index(Request $request)
     {
         $query = Ticket::with([
-        'requester.company',
-        'assignee', 
-        'priority', 
-        'category', 
-        'company',
-        'attachments' => function ($q) {
-            $q->whereNull('ticket_comment_id');
+            'requester.company',
+            'assignee', 
+            'assignedTechnicians', // <-- Pastikan relasi ini ditambahkan di sini
+            'priority', 
+            'category', 
+            'company',
+            'attachments' => function ($q) {
+                $q->whereNull('ticket_comment_id');
             }
         ]);
 
@@ -104,7 +105,12 @@ class TicketController extends Controller
             $query->where('requester_id', Auth::id());
         } elseif (Auth::user()->role === 'technician') {
             if ($request->get('view', 'assigned') === 'assigned') {
-                $query->where('assigned_to', Auth::id());
+                $query->where(function($q) {
+                    $q->where('assigned_to', Auth::id())
+                      ->orWhereHas('assignedTechnicians', function($t) {
+                          $t->where('user_id', Auth::id());
+                      });
+                });
             }
         }
 
@@ -126,7 +132,6 @@ class TicketController extends Controller
                   ->orWhere('title', 'like', "%{$request->search}%");
             });
         }
-        
 
         $tickets = $query->orderByDesc('created_at')->paginate(15);
         $priorities = Priority::all();
@@ -780,6 +785,7 @@ class TicketController extends Controller
         $query = Ticket::with([
             'requester.company', 
             'assignee', 
+            'assignedTechnicians', // <-- Pastikan relasi ini juga ditambahkan di sini
             'priority', 
             'category', 
             'company',
@@ -788,21 +794,9 @@ class TicketController extends Controller
             }
         ]);
 
-        // Filter khusus berdasarkan role user yang login untuk halaman My Tickets
         if ($user->role === 'user') {
-            // User biasa hanya melihat tiket miliknya sendiri
             $query->where('requester_id', $user->id);
-        } elseif ($user->role === 'technician') {
-            // Teknisi melihat tiket yang di-assign langsung, via multi-assign, atau unassigned
-            $query->where(function($q) use ($user) {
-                $q->where('assigned_to', $user->id)
-                  ->orWhereHas('assignedTechnicians', function($t) use ($user) {
-                      $t->where('user_id', $user->id);
-                  })
-                  ->orWhereNull('assigned_to');
-            });
-        } elseif ($user->role === 'admin') {
-            // Admin bisa melihat tiket yang di-assign langsung, via multi-assign, atau unassigned
+        } elseif ($user->role === 'technician' || $user->role === 'admin') {
             $query->where(function($q) use ($user) {
                 $q->where('assigned_to', $user->id)
                   ->orWhereHas('assignedTechnicians', function($t) use ($user) {
@@ -812,7 +806,6 @@ class TicketController extends Controller
             });
         }
 
-        // Filter tambahan (Status, Priority, Category, Search) jika ada
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }

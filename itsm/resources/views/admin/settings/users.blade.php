@@ -88,17 +88,21 @@
                         <div class="flex items-center gap-3">
                             @php
                                 $displayFullName = $user->name;
-                                // Jika name berisi angka NIK atau format email prefix mentah, rapihkan tampilannya
+                                // Jika nama masih berisi NIK/Angka, amankan dengan nama berbasis email/posisi
                                 if (preg_match('/^[P]?\d+$/', $displayFullName)) {
-                                    $displayFullName = ucwords(str_replace(['.', '_'], ' ', explode('@', $user->email)[0]));
+                                    $displayFullName = !empty($user->position) && !preg_match('/^[P]?\d+$/', $user->position) 
+                                        ? $user->position 
+                                        : ucwords(str_replace(['.', '_'], ' ', explode('@', $user->email)[0]));
                                 }
                             @endphp
                             <div class="w-9 h-9 bg-brand-100 rounded-full flex items-center justify-center shadow-sm">
                                 <span class="text-xs font-bold text-brand-700">{{ strtoupper(substr($displayFullName, 0, 2)) }}</span>
                             </div>
                             <div>
-                                <p class="text-sm font-semibold text-gray-900">{{ $displayFullName }}</p>
-                                <p class="text-xs text-gray-500">{{ $user->position ?? $user->job_title ?? '-' }}</p>
+                                <!-- Nama Lengkap dipanggil tegas & jelas -->
+                                <p class="text-sm font-bold text-gray-900">{{ $displayFullName }}</p>
+                                <!-- Jabatan/Posisi -->
+                                <p class="text-xs text-gray-500 font-medium">{{ $user->job_title ?? $user->position ?? '-' }}</p>
                             </div>
                         </div>
                     </td>

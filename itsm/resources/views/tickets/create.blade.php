@@ -42,15 +42,24 @@
                                     $isVessel = str_contains(strtolower($u->name), 'mt ') || str_contains(strtolower($u->email), 'vessel') || str_contains(strtolower($u->position ?? ''), 'vessel');
                                     $locationType = $isVessel ? 'vessel' : 'office';
                                     
+                                    // 1. Dapatkan Nama Lengkap (Fallback jika nama masih berisi NIK/Angka)
+                                    $displayName = $u->name;
+                                    if (preg_match('/^[P]?\d+$/', $displayName)) {
+                                        $displayName = !empty($u->position) && !preg_match('/^[P]?\d+$/', $u->position) 
+                                            ? $u->position 
+                                            : ucwords(str_replace(['.', '_'], ' ', explode('@', $u->email)[0]));
+                                    }
+
+                                    // 2. Dapatkan Jabatan, Email, Perusahaan
                                     $jobTitle = $u->job_title ?? ($u->position ?? '');
                                     $companyName = $u->company->name ?? 'No Company';
                                     
-                                    // Tampilkan Full Name persis dari database
-                                    $optionText = $u->name;
-                                    if ($jobTitle) { 
+                                    // 3. Susun Teks Opsi Dropdown: Nama Lengkap - Jabatan (Email) [Perusahaan]
+                                    $optionText = $displayName;
+                                    if ($jobTitle && strtolower($jobTitle) !== strtolower($displayName)) { 
                                         $optionText .= ' - ' . $jobTitle; 
                                     }
-                                    if ($u->email) { 
+                                    if (!empty($u->email)) { 
                                         $optionText .= ' (' . $u->email . ')'; 
                                     }
                                     $optionText .= ' [' . $companyName . ']';

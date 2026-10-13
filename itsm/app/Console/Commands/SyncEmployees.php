@@ -33,7 +33,7 @@ class SyncEmployees extends Command
             ])->get("$apiUrl?page=$page&per_page=$perPage");
 
             if (!$response->successful()) {
-                $this->error("Failed to fetch employee data from API on page {$page}.");
+                $this->error("Failed to fetch employee data from API on page {$page}. Status: " . $response->status() . " | Body: " . $response->body());
                 break;
             }
 
@@ -48,7 +48,8 @@ class SyncEmployees extends Command
                 $email = $emp['email_work'] ?? null;
                 if (!$email) continue;
 
-                $name = $emp['name'] ?? $emp['employee_name'] ?? $emp['fullname'] ?? ucwords(str_replace(['.', '_'], ' ', explode('@', $email)[0]));
+                // Tambahkan $emp['full_name'] di urutan pertama agar mendeteksi nama lengkap dari API Master Employee dengan tepat
+                $name = $emp['full_name'] ?? $emp['name'] ?? $emp['employee_name'] ?? $emp['fullname'] ?? ucwords(str_replace(['.', '_'], ' ', explode('@', $email)[0]));
 
                 $lowerEmail = strtolower(trim($email));
                 $rawTitle = $emp['job_title'] ?? $emp['position'] ?? '';

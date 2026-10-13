@@ -153,66 +153,89 @@
         </div>
 
         <!-- Rating (required) -->
-        @if($ticket->status === 'resolved' && $ticket->requester_id === Auth::id() && !$ticket->rating)
-        <div class="bg-white rounded-xl border-2 border-amber-300 p-6">
-            <div class="flex items-center gap-3 mb-3">
-                <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center"><i class="fas fa-star text-amber-500"></i></div>
-                <div>
-                    <h3 class="text-base font-semibold text-gray-900">⭐ Rating Required</h3>
-                    <p class="text-xs text-gray-500">The ticket will not close until you submit a rating.</p>
-                </div>
-            </div>
-            <form action="{{ route('tickets.rateAndClose', $ticket) }}" method="POST" class="space-y-4 mt-4">
-                @csrf
-                <div>
-                    <label class="block text-xs font-semibold text-gray-500 uppercase mb-2">Overall Rating *</label>
-                    <div class="flex gap-1" id="star-rating">
-                        @for($i = 1; $i <= 5; $i++)
-                        <button type="button" onclick="setRating({{ $i }})" class="star text-4xl text-gray-200 hover:text-amber-400 transition cursor-pointer" data-value="{{ $i }}">★</button>
-                        @endfor
+        <!-- RATING & REOPEN CONTAINER FOR REQUESTER -->
+        @if($ticket->requester_id === Auth::id() && $ticket->status === 'resolved')
+            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 shadow-sm mb-6 space-y-5">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center font-bold text-lg shadow-md">
+                        <i class="fas fa-star"></i>
                     </div>
-                    <input type="hidden" name="rating" id="rating-value" required>
+                    <div>
+                        <h3 class="text-base font-bold text-gray-900">Your Ticket Has Been Resolved</h3>
+                        <p class="text-xs text-gray-600">Please rate the technician's performance to officially close this ticket, or request a reopen if the issue persists.</p>
+                    </div>
                 </div>
-                
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Feedback (optional)</label>
-                    <textarea name="feedback" rows="3" class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm" placeholder="Add additional comments..."></textarea>
-                </div>
-                <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-lg text-sm font-semibold transition">
-                    Submit Rating & Close Ticket
-                </button>
-            </form>
-        </div>
-        @endif
 
-        <!-- Rating Display -->
-        @if($ticket->rating)
-        <div class="bg-white rounded-xl border border-gray-100 p-5">
-            <div class="flex items-center gap-2 mb-2">
-                <span class="text-amber-400 text-lg">@for($i=1;$i<=5;$i++){!! $i <= $ticket->rating->rating ? '★' : '<span class="text-gray-200">★</span>' !!}@endfor</span>
-                <span class="text-sm font-semibold text-gray-700">{{ $ticket->rating->rating }}/5</span>
-            </div>
-            @if($ticket->rating->feedback)<p class="text-sm text-gray-600 italic">"{{ $ticket->rating->feedback }}"</p>@endif
-            @if($ticket->rating->resolution_time_minutes)<p class="text-xs text-gray-400 mt-2">Resolution time: {{ floor($ticket->rating->resolution_time_minutes/60) }}h {{ $ticket->rating->resolution_time_minutes%60 }}m</p>@endif
-        </div>
-        @endif
+                @if(!$ticket->rating)
+                    <!-- Rating Form -->
+                    <form action="{{ route('tickets.rateAndClose', $ticket) }}" method="POST" class="space-y-4 bg-white p-5 rounded-xl border border-blue-100 shadow-xs">
+                        @csrf
+                        <div>
+                            <label class="block text-xs font-bold text-gray-800 mb-2">Rate Technician Performance *</label>
+                            <div class="flex items-center gap-2" id="dashboard-star-container">
+                                @for($i = 1; $i <= 5; $i++)
+                                    <button type="button" onclick="setDashboardRating({{ $i }})" 
+                                            class="dashboard-star-btn text-3xl text-gray-300 hover:text-amber-400 focus:outline-none transition-transform hover:scale-110 cursor-pointer" 
+                                            data-value="{{ $i }}">★</button>
+                                @endfor
+                            </div>
+                            <input type="hidden" name="rating" id="dashboard-rating-value" required>
+                            <p id="dashboard-rating-text" class="text-xs font-semibold text-amber-600 mt-1 min-h-[16px]"></p>
+                        </div>
 
-        <!-- KODE BARU: REOPEN TICKET -->
-        @if($ticket->status === 'resolved' && $ticket->requester_id === Auth::id())
-        <div class="bg-white rounded-xl border border-red-100 p-5">
-            <div class="flex items-center gap-3 mb-3">
-                <div class="w-9 h-9 bg-red-50 rounded-lg flex items-center justify-center"><i class="fas fa-redo text-red-500 text-sm"></i></div>
-                <div>
-                    <h3 class="text-sm font-semibold text-gray-900">Issue not resolved?</h3>
-                    <p class="text-xs text-gray-500">Reopen the ticket if the problem persists after resolution.</p>
-                </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Additional Feedback (Optional)</label>
+                            <textarea name="feedback" rows="2" class="w-full border border-gray-200 rounded-lg p-3 text-xs focus:ring-2 focus:ring-blue-500" placeholder="Write your feedback regarding the technical service..."></textarea>
+                        </div>
+
+                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition shadow flex items-center justify-center gap-2">
+                            <i class="fas fa-paper-plane"></i> Submit Rating & Close Ticket
+                        </button>
+                    </form>
+
+                    <!-- Reopen Accordion Form -->
+                    <div class="border border-red-200 rounded-xl bg-red-50/50 p-4">
+                        <details class="group">
+                            <summary class="flex justify-between items-center font-bold text-xs text-red-700 cursor-pointer list-none">
+                                <span class="flex items-center gap-2"><i class="fas fa-exclamation-triangle"></i> Issue Not Resolved Yet? Click to Reopen</span>
+                                <span class="transition group-open:rotate-180"><i class="fas fa-chevron-down"></i></span>
+                            </summary>
+                            <form action="{{ route('tickets.reopen', $ticket) }}" method="POST" class="mt-3 space-y-3">
+                                @csrf
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">Explain what is still not working *</label>
+                                    <textarea name="reason" rows="2" required class="w-full border border-red-200 rounded-lg p-2.5 text-xs bg-white focus:ring-2 focus:ring-red-500" placeholder="Describe the remaining issue..."></textarea>
+                                </div>
+                                <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg text-xs transition">
+                                    Request Reopen Ticket
+                                </button>
+                            </form>
+                        </details>
+                    </div>
+                @else
+                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+                        <div class="text-2xl mb-1 text-amber-400">
+                            @for($i=1; $i<=5; $i++)
+                                {!! $i <= $ticket->rating->rating ? '★' : '<span class="text-gray-200">★</span>' !!}
+                            @endfor
+                        </div>
+                        <p class="text-xs font-bold text-gray-800">You have rated this ticket!</p>
+                        @if($ticket->rating->feedback)
+                            <p class="text-xs text-gray-600 italic mt-1">"{{ $ticket->rating->feedback }}"</p>
+                        @endif
+                    </div>
+                @endif
             </div>
-            <form action="{{ route('tickets.reopen', $ticket) }}" method="POST" class="flex gap-2">
-                @csrf
-                <input type="text" name="reason" required placeholder="Explain why the issue is not resolved..." class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm">
-                <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">Reopen</button>
-            </form>
-        </div>
+        @elseif($ticket->rating)
+            <!-- RATING DISPLAY FOR NON-REQUESTER / CLOSED TICKET -->
+            <div class="bg-white rounded-xl border border-gray-100 p-5 mb-6">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-amber-400 text-lg">@for($i=1;$i<=5;$i++){!! $i <= $ticket->rating->rating ? '★' : '<span class="text-gray-200">★</span>' !!}@endfor</span>
+                    <span class="text-sm font-semibold text-gray-700">{{ $ticket->rating->rating }}/5</span>
+                </div>
+                @if($ticket->rating->feedback)<p class="text-sm text-gray-600 italic">"{{ $ticket->rating->feedback }}"</p>@endif
+                @if($ticket->rating->resolution_time_minutes)<p class="text-xs text-gray-400 mt-2">Resolution time: {{ floor($ticket->rating->resolution_time_minutes/60) }}h {{ $ticket->rating->resolution_time_minutes%60 }}m</p>@endif
+            </div>
         @endif
 
         <!-- Activity & Comments -->
@@ -335,11 +358,11 @@
                                         <i class="fas fa-paperclip text-gray-400 group-hover:text-brand-500 transition"></i>
                                         <p class="text-xs text-gray-600 font-medium">Click or drag files here to attach</p>
                                     </div>
-                                    <p class="text-[10px] text-gray-400 font-medium">Mendukung semua format file (ZIP, RAR, Foto, Video, Dokumen)</p>
+                                    <p class="text-[10px] text-gray-400 font-medium">Support all file formats (ZIP, RAR, Photo, Video, Document)</p>
                                 </div>
                                 <!-- Hapus atribut accept agar semua ekstensi diizinkan -->
                                <input type="file" id="comment-file-upload" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.tar,.7z,.mp4,.mov,.avi,.mkv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="previewCommentFiles()">
-                                <p class="text-xs text-gray-600 font-medium">Click or drag files here to attach (ZIP, RAR, Foto, Video, Dokumen)</p>
+                                <p class="text-xs text-gray-600 font-medium">Click or drag files here to attach (ZIP, RAR, Photo, Video, Document)</p>
                             </div>
                             <!-- Container Preview File sebelum dikirim -->
                             <div id="comment-file-preview-container" class="mt-3 flex flex-wrap gap-2 hidden"></div>
@@ -389,7 +412,7 @@
             <div class="space-y-2 text-sm pt-3 border-t border-gray-100">
                 <!-- Menampilkan Asal Perusahaan / PT (Mengambil dari relasi Company tiket) -->
                 <div class="flex justify-between items-center">
-                    <span class="text-gray-500 text-xs">Dari Perusahaan</span>
+                    <span class="text-gray-500 text-xs">From Company</span>
                     <span class="text-gray-800 font-semibold text-xs text-right">
                         {{ $ticket->company->name ?? ($reqUser?->company?->name ?? 'PT Amarin Ship Management') }}
                     </span>

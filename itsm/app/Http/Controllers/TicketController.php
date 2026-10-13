@@ -553,16 +553,22 @@ class TicketController extends Controller
             $data['resolution_notes'] = $request->resolution_notes;
 
             $ticket->load(['requester', 'assignee', 'assignedTechnicians']);
+            
+            // Prioritaskan nomor telp dari requester, fallback ke WA_DEFAULT_TO jika requester kosong
             $requesterPhone = $ticket->requester?->phone;
+            if (empty($requesterPhone) && $ticket->requester_id) {
+                // Ambil nomor fallback jika di DB bernilai null
+                $requesterPhone = env('WA_DEFAULT_TO', '628563339320');
+            }
 
-            if ($requesterPhone) {
+            if (!empty($requesterPhone)) {
                 try {
                     $publicLink = route('ticket.public.review', $ticket->public_token);
                     
                     // Format Nama Teknisi yang Mengerjakan
                     $techs = $ticket->assignedTechnicians->pluck('name')->join(', ') ?: ($ticket->assignee?->name ?? 'Tim IT');
 
-                    // --- TEKS BERPENEKANAN PSIKOLOGIS & PENUH PERINDAH BOLD ---
+                    // --- TEKS WA UNTUK REQUESTER (FULL ENGLISH) ---
                     $waMessage  = "⚠️ *[YOUR PROBLEM SOLVED - TICKET RESOLVED - RATING REQUIRED]* ⚠️\n\n";
                     $waMessage .= "Dear *{$ticket->requester->name}*,\n\n";
                     $waMessage .= "Your ticket *{$ticket->ticket_number}* (*{$ticket->title}*) has been **RESOLVED** by *{$techs}*.\n\n";
@@ -577,7 +583,7 @@ class TicketController extends Controller
                     $waMessage .= "*If the issue is NOT completely resolved, you can choose to REOPEN the ticket via the link above.*\n\n";
                     $waMessage .= "_Thank you for your cooperation!_";
 
-                    // Kirim langsung ke HP Requester
+                    // Kirim pesan rating langsung ke WhatsApp Requester
                     $this->waService->sendMessage($requesterPhone, $waMessage);
                 } catch (\Exception $e) {
                     Log::error('Gagal mengirim WA Public Review ke Requester: ' . $e->getMessage());

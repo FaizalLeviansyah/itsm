@@ -153,7 +153,15 @@
         </div>
 
         <!-- Rating (required) -->
+        <!-- Rating (required) -->
         <!-- RATING & REOPEN CONTAINER FOR REQUESTER -->
+        @php
+            $assignedTechs = $ticket->assignedTechnicians;
+            if ($assignedTechs->isEmpty() && $ticket->assignee) {
+                $assignedTechs = collect([$ticket->assignee]);
+            }
+        @endphp
+
         @if($ticket->requester_id === Auth::id() && $ticket->status === 'resolved')
             <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 shadow-sm mb-6 space-y-5">
                 <div class="flex items-center gap-3">
@@ -162,34 +170,60 @@
                     </div>
                     <div>
                         <h3 class="text-base font-bold text-gray-900">Your Ticket Has Been Resolved</h3>
-                        <p class="text-xs text-gray-600">Please rate the technician's performance to officially close this ticket, or request a reopen if the issue persists.</p>
+                        <p class="text-xs text-gray-600">Please rate each assigned technician's performance below to officially close this ticket.</p>
                     </div>
                 </div>
 
                 @if(!$ticket->rating)
-                    <!-- Rating Form -->
-                    <form action="{{ route('tickets.rateAndClose', $ticket) }}" method="POST" class="space-y-4 bg-white p-5 rounded-xl border border-blue-100 shadow-xs">
+                    <!-- Multi-Technician Rating Form -->
+                    <form action="{{ route('tickets.rateAndClose', $ticket) }}" method="POST" class="space-y-4">
                         @csrf
-                        <div>
-                            <label class="block text-xs font-bold text-gray-800 mb-2">Rate Technician Performance *</label>
-                            <div class="flex items-center gap-2" id="dashboard-star-container">
-                                @for($i = 1; $i <= 5; $i++)
-                                    <button type="button" onclick="setDashboardRating({{ $i }})" 
-                                            class="dashboard-star-btn text-3xl text-gray-300 hover:text-amber-400 focus:outline-none transition-transform hover:scale-110 cursor-pointer" 
-                                            data-value="{{ $i }}">★</button>
-                                @endfor
-                            </div>
-                            <input type="hidden" name="rating" id="dashboard-rating-value" required>
-                            <p id="dashboard-rating-text" class="text-xs font-semibold text-amber-600 mt-1 min-h-[16px]"></p>
+                        
+                        <!-- GRID CARD TERPISAH DINAMIS UNTUK TIAP TEKNISI -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            @foreach($assignedTechs as $tech)
+                                <div class="bg-white p-5 rounded-xl border border-blue-100 shadow-xs space-y-3">
+                                    <div class="flex items-center gap-3 pb-3 border-b border-gray-100">
+                                        <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+                                            {{ strtoupper(substr($tech->name, 0, 2)) }}
+                                        </div>
+                                        <div>
+                                            <h4 class="text-xs font-bold text-gray-900">{{ $tech->name }}</h4>
+                                            <span class="text-[10px] text-gray-500 capitalize">{{ $tech->role ?? 'Technician' }}</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Star Rating per Teknisi -->
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-gray-700 mb-1">Rate Performance *</label>
+                                        <div class="flex items-center gap-1" id="star-container-{{ $tech->id }}">
+                                            @for($i = 1; $i <= 5; $i++)
+                                                <button type="button" onclick="setTechRating({{ $tech->id }}, {{ $i }})" 
+                                                        class="star-btn-{{ $tech->id }} text-2xl text-gray-300 hover:text-amber-400 focus:outline-none transition-transform hover:scale-110 cursor-pointer" 
+                                                        data-value="{{ $i }}">★</button>
+                                            @endfor
+                                        </div>
+                                        <!-- Input hidden dinamis per ID Teknisi -->
+                                        <input type="hidden" name="ratings[{{ $tech->id }}]" id="rating-value-{{ $tech->id }}" required>
+                                        <p id="rating-text-{{ $tech->id }}" class="text-[10px] font-semibold text-amber-600 mt-1 min-h-[14px]"></p>
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-gray-700 uppercase mb-1">Feedback for {{ explode(' ', $tech->name)[0] }} (Opt)</label>
+                                        <input type="text" name="feedbacks[{{ $tech->id }}]" class="w-full border border-gray-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-blue-500" placeholder="Optional comment...">
+                                    </div>
+                                </div>
+                            @endforeach
                         </div>
 
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Additional Feedback (Optional)</label>
-                            <textarea name="feedback" rows="2" class="w-full border border-gray-200 rounded-lg p-3 text-xs focus:ring-2 focus:ring-blue-500" placeholder="Write your feedback regarding the technical service..."></textarea>
+                        <!-- Feedback Umum Tiket -->
+                        <div class="bg-white p-4 rounded-xl border border-blue-100 shadow-xs">
+                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Additional Overall Feedback (Optional)</label>
+                            <textarea name="feedback" rows="2" class="w-full border border-gray-200 rounded-lg p-3 text-xs focus:ring-2 focus:ring-blue-500" placeholder="Write overall comments regarding the technical service..."></textarea>
                         </div>
 
                         <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition shadow flex items-center justify-center gap-2">
-                            <i class="fas fa-paper-plane"></i> Submit Rating & Close Ticket
+                            <i class="fas fa-paperplane"></i> Submit Ratings & Close Ticket
                         </button>
                     </form>
 
@@ -440,19 +474,33 @@
 
         
 
-        <!-- ASSIGNEE INFO DENGAN TIMELINE TRAIL -->
+        <!-- ASSIGNEE INFO DENGAN MULTIPLE ASSIGNED & TIMELINE TRAIL -->
         <div class="bg-white rounded-xl border border-gray-100 p-6 mb-6">
             <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Assignee Info</h3>
             
-            @if($ticket->assignee)
+            @if($ticket->assignedTechnicians && $ticket->assignedTechnicians->count() > 0)
+                <!-- Menampilkan Semua Teknisi yang di-Multiple Assign -->
+                <div class="space-y-3">
+                    @foreach($ticket->assignedTechnicians as $tech)
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">
+                                {{ strtoupper(substr($tech->name, 0, 2)) }}
+                            </div>
+                            <div>
+                                <div class="font-semibold text-gray-900">{{ $tech->name }}</div>
+                                <div class="text-xs text-gray-500 capitalize">{{ $tech->role ?? 'Technician' }}</div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @elseif($ticket->assignee)
                 <div class="flex items-center gap-3">
-                    <!-- Avatar Inisial Teknisi -->
-                    <div class="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                    <div class="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">
                         {{ strtoupper(substr($ticket->assignee->name, 0, 2)) }}
                     </div>
                     <div>
                         <div class="font-semibold text-gray-900">{{ $ticket->assignee->name }}</div>
-                        <div class="text-sm text-gray-500 capitalize">{{ $ticket->assignee->role ?? 'Technician' }}</div>
+                        <div class="text-xs text-gray-500 capitalize">{{ $ticket->assignee->role ?? 'Technician' }}</div>
                     </div>
                 </div>
             @else
@@ -465,7 +513,7 @@
                     </div>
                     <div>
                         <div class="font-medium text-gray-500">Unassigned</div>
-                        <div class="text-sm text-gray-400">Belum ada teknisi</div>
+                        <div class="text-xs text-gray-400">Belum ada teknisi</div>
                     </div>
                 </div>
             @endif
@@ -777,12 +825,36 @@ function updateCommentFileInputAndPreview() {
 }
 </script>
 <script>
-function setRating(value) {
-    document.getElementById('rating-value').value = value;
-    document.querySelectorAll('.star').forEach((star, i) => {
-        star.classList.toggle('text-amber-400', i < value);
-        star.classList.toggle('text-gray-200', i >= value);
+function setTechRating(techId, value) {
+    const inputEl = document.getElementById(`rating-value-${techId}`);
+    if (inputEl) {
+        inputEl.value = value;
+    }
+
+    const stars = document.querySelectorAll(`.star-btn-${techId}`);
+    const label = document.getElementById(`rating-text-${techId}`);
+    
+    const labels = {
+        1: '1/5 - Poor',
+        2: '2/5 - Unsatisfactory',
+        3: '3/5 - Average',
+        4: '4/5 - Good & Fast',
+        5: '5/5 - Excellent'
+    };
+
+    stars.forEach((star, index) => {
+        if (index < value) {
+            star.classList.remove('text-gray-300');
+            star.classList.add('text-amber-400');
+        } else {
+            star.classList.remove('text-amber-400');
+            star.classList.add('text-gray-300');
+        }
     });
+
+    if (label) {
+        label.innerText = labels[value] || '';
+    }
 }
 </script>
 @endpush

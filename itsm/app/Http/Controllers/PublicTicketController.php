@@ -40,30 +40,33 @@ class PublicTicketController extends Controller
         }
 
         $request->validate([
-            'action'   => 'required|in:rate,reopen',
-            'rating'   => 'required_if:action,rate|nullable|integer|min:1|max:5',
-            'feedback' => 'nullable|string|max:1000',
-            'reason'   => 'required_if:action,reopen|nullable|string|max:1000',
+            'action'        => 'required|in:rate,reopen',
+            'ratings'       => 'required_if:action,rate|array',
+            'ratings.*'     => 'required|integer|min:1|max:5',
+            'feedbacks'     => 'nullable|array',
+            'feedback'      => 'nullable|string|max:1000',
+            'reason'        => 'required_if:action,reopen|nullable|string|max:1000',
         ]);
-        // ==========================================
-        // 1. SKENARIO AKSI: RATE & CLOSE TICKET
-        // ==========================================
+
         if ($request->action === 'rate') {
+            $ratingsArray = $request->input('ratings', []);
+            $feedbacksArray = $request->input('feedbacks', []);
+            
+            // Hitung rata-rata skor jika diperlukan untuk kolom tunggal 'rating' utama, atau ambil yang pertama
+            $avgRating = count($ratingsArray) > 0 ? array_sum($ratingsArray) / count($ratingsArray) : 5;
+            $firstTechId = array_key_first($ratingsArray) ?? $ticket->assigned_to;
+            $firstFeedback = isset($feedbacksArray[$firstTechId]) ? $feedbacksArray[$firstTechId] : $request->feedback;
+
             TicketRating::updateOrCreate(
                 ['ticket_id' => $ticket->id],
                 [
                     'user_id'                 => $ticket->requester_id,
-                    'technician_id'           => $ticket->assigned_to,
-                    'rating'                  => $request->rating,
-                    'feedback'                => $request->feedback,
+                    'technician_id'           => $firstTechId,
+                    'rating'                  => round($avgRating),
+                    'feedback'                => $request->feedback ?? $firstFeedback,
                     'resolution_time_minutes' => $ticket->resolution_time,
                 ]
             );
-
-            $ticket->update([
-                'status'    => 'closed',
-                'closed_at' => now(),
-            ]);
 
             TicketHistory::create([
                 'ticket_id' => $ticket->id,
@@ -71,7 +74,7 @@ class PublicTicketController extends Controller
                 'field'     => 'status',
                 'old_value' => 'resolved',
                 'new_value' => 'closed',
-                'note'      => 'Rated via Public Review Link: ' . $request->rating . ' Stars',
+                'note'      => 'Rated via Public Review Link: ' . round($avgRating) . ' Stars',
             ]);
 
             return back()->with('success', 'Thank you! Your rating has been saved and the ticket is now officially Closed.');

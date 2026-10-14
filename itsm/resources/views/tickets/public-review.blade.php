@@ -79,34 +79,75 @@
                     </div>
                 </div>
 
-                <!-- Rating & Feedback Form -->
+                <!-- B. RESOLVED STATUS: RATING FORM & REOPEN OPTION -->
+                @php
+                    $assignedTechs =$ticket->assignedTechnicians;
+                    if ($assignedTechs->isEmpty() &&$ticket->assignee) {
+                        $assignedTechs = collect([$ticket->assignee]);
+                    }
+                @endphp
+
+                <div class="bg-blue-50/60 border border-blue-100 rounded-xl p-4 md:p-5 mb-5">
+                    <h3 class="text-xs font-bold text-blue-900 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                        <i class="fas fa-check-circle text-blue-600"></i> Your Issue Has Been Resolved
+                    </h3>
+                    <p class="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{{ $ticket->resolution_notes ?? 'Technical work has been completed by our IT team.' }}</p>
+
+                    <div class="mt-3 pt-3 border-t border-blue-100 text-xs text-gray-500 flex items-center gap-2">
+                        <i class="fas fa-user-check text-blue-600"></i> Handled by: 
+                        <span class="font-semibold text-gray-800">{{ $assignedTechs->pluck('name')->join(', ') ?: 'IT Support Team' }}</span>
+                    </div>
+                </div>
+
+                <!-- Multi-Technician Rating Form -->
                 <form action="{{ route('ticket.public.submit', $ticket->public_token) }}" method="POST" id="review-form" class="space-y-6">
                     @csrf
                     <input type="hidden" name="action" value="rate">
 
-                    <div class="text-center md:text-left">
-                        <label class="block text-sm font-bold text-gray-800 mb-2">Rate Technician Performance *</label>
-                        <p class="text-xs text-gray-500 mb-3">Click on the stars based on your satisfaction level (1 = Poor, 5 = Excellent):</p>
-                        
-                        <!-- Star Rating UI -->
-                        <div class="flex items-center justify-center md:justify-start gap-2" id="star-container">
-                            @for($i = 1; $i <= 5; $i++)
-                                <button type="button" onclick="setPublicRating({{ $i }})" 
-                                        class="star-btn text-4xl text-gray-300 hover:text-amber-400 focus:outline-none transition-transform hover:scale-110 cursor-pointer" 
-                                        data-value="{{ $i }}">★</button>
-                            @endfor
-                        </div>
-                        <input type="hidden" name="rating" id="public-rating-value" required>
-                        <p id="rating-text" class="text-xs font-semibold text-amber-600 mt-2 min-h-[16px]"></p>
+                    <!-- GRID CARD TERPISAH DINAMIS UNTUK TIAP TEKNISI -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        @foreach($assignedTechs as$tech)
+                            <div class="bg-white p-5 rounded-xl border border-blue-100 shadow-xs space-y-3">
+                                <div class="flex items-center gap-3 pb-3 border-b border-gray-100">
+                                    <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+                                        {{ strtoupper(substr($tech->name, 0, 2)) }}
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xs font-bold text-gray-900">{{ $tech->name }}</h4>
+                                        <span class="text-[10px] text-gray-500 capitalize">{{ $tech->role ?? 'Technician' }}</span>
+                                    </div>
+                                </div>
+
+                                <!-- Star Rating per Teknisi -->
+                                <div>
+                                    <label class="block text-[11px] font-bold text-gray-700 mb-1">Rate Performance *</label>
+                                    <div class="flex items-center gap-1" id="star-container-{{ $tech->id }}">
+                                        @for($i = 1; $i <= 5; $i++)
+                                            <button type="button" onclick="setTechRating({{ $tech->id }}, {{$i }})" 
+                                                    class="star-btn-{{ $tech->id }} text-2xl text-gray-300 hover:text-amber-400 focus:outline-none transition-transform hover:scale-110 cursor-pointer" 
+                                                    data-value="{{ $i }}">★</button>
+                                        @endfor
+                                    </div>
+                                    <input type="hidden" name="ratings[{{ $tech->id }}]" id="rating-value-{{ $tech->id }}" required>
+                                    <p id="rating-text-{{ $tech->id }}" class="text-[10px] font-semibold text-amber-600 mt-1 min-h-[14px]"></p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-[10px] font-bold text-gray-700 uppercase mb-1">Feedback for {{ explode(' ', $tech->name)[0] }} (Opt)</label>
+                                    <input type="text" name="feedbacks[{{ $tech->id }}]" class="w-full border border-gray-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-blue-500" placeholder="Optional comment...">
+                                </div>
+                            </div>
+                        @endforeach
                     </div>
 
+                    <!-- Feedback Umum Tiket -->
                     <div>
-                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Additional Feedback / Comments (Optional)</label>
-                        <textarea name="feedback" rows="3" class="w-full border border-gray-200 rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Write your comments about our technical service..."></textarea>
+                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Additional Overall Feedback (Optional)</label>
+                        <textarea name="feedback" rows="2" class="w-full border border-gray-200 rounded-xl p-3 text-xs focus:ring-2 focus:ring-blue-500" placeholder="Write overall comments regarding the technical service..."></textarea>
                     </div>
 
                     <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl text-sm transition shadow-md hover:shadow-lg flex items-center justify-center gap-2">
-                        <i class="fas fa-paper-plane"></i> Submit Rating & Close Ticket
+                        <i class="fas fa-paperplane"></i> Submit Ratings & Close Ticket
                     </button>
                 </form>
 
@@ -158,10 +199,14 @@
 </div>
 
 <script>
-function setPublicRating(value) {
-    document.getElementById('public-rating-value').value = value;
-    const stars = document.querySelectorAll('.star-btn');
-    const label = document.getElementById('rating-text');
+function setTechRating(techId, value) {
+    const inputEl = document.getElementById(`rating-value-${techId}`);
+    if (inputEl) {
+        inputEl.value = value;
+    }
+
+    const stars = document.querySelectorAll(`.star-btn-${techId}`);
+    const label = document.getElementById(`rating-text-${techId}`);
     
     const labels = {
         1: '1/5 - Poor',

@@ -779,20 +779,28 @@ class TicketController extends Controller
         }
 
         $request->validate([
-            'rating' => 'required|integer|min:1|max:5',
-            'feedback' => 'nullable|string|max:1000'
+            'ratings'    => 'required|array',
+            'ratings.*'  => 'required|integer|min:1|max:5',
+            'feedbacks'  => 'nullable|array',
+            'feedback'   => 'nullable|string|max:1000'
         ]);
 
         $ticket->load('requester');
         $requesterId   = $ticket->requester_id;
         $requesterName = $ticket->requester?->name ?? 'Requester';
 
-        // TERCATAT ATAS NAMA REQUESTER ASLI TIKET (BEBAS BENTROK AUTH)
+        $ratingsArray = $request->input('ratings', []);
+        $feedbacksArray = $request->input('feedbacks', []);
+
+        $avgRating = count($ratingsArray) > 0 ? array_sum($ratingsArray) / count($ratingsArray) : 5;
+        $firstTechId = array_key_first($ratingsArray) ?? $ticket->assigned_to;
+        $firstFeedback = isset($feedbacksArray[$firstTechId]) ? $feedbacksArray[$firstTechId] : $request->feedback;
+
         $ticket->rating()->create([
-            'user_id' => $requesterId, 
-            'technician_id' => $ticket->assigned_to,
-            'rating' => $request->rating,
-            'feedback' => $request->feedback,
+            'user_id'                 => $requesterId, 
+            'technician_id'           => $firstTechId,
+            'rating'                  => round($avgRating),
+            'feedback'                => $request->feedback ?? $firstFeedback,
             'resolution_time_minutes' => $ticket->resolution_time,
         ]);
 
@@ -807,14 +815,14 @@ class TicketController extends Controller
             'field' => 'status',
             'old_value' => 'resolved',
             'new_value' => 'closed',
-            'note' => "Tiket diselesaikan dan diulas oleh requester ({$requesterName}) dengan rating: " . $request->rating . ' Bintang',
+            'note' => "Tiket diselesaikan dan diulas oleh requester ({$requesterName}) dengan rating: " . round($avgRating) . ' Bintang',
         ]);
 
         try {
             $ticket->load(['assignee', 'rating']);
             
             $this->waService->notifyTicketClosed($ticket);
-            $this->notifyAdminViaWa($ticket, 'Ticket Closed & Rated', 'Requester: ' . $requesterName . ' | Rating: ' . $request->rating . '/5');
+            $this->notifyAdminViaWa($ticket, 'Ticket Closed & Rated', 'Requester: ' . $requesterName . ' | Rating: ' . round($avgRating) . '/5');
 
             if ($ticket->assignee) {
                 $ticket->assignee->notify(new TicketNotification($ticket, 'closed'));

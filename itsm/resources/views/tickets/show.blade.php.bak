@@ -56,7 +56,7 @@
                             <h3 class="text-base font-bold text-amber-900">Tiket Menunggu Approval</h3>
                             <p class="text-xs text-amber-800 mt-0.5">
                                 Tiket ini dibuat oleh <strong>{{ $ticket->histories->first()?->user->name ?? 'Admin/Teknisi' }}</strong> 
-                                atas nama <strong>{{ $ticket->requester->name }}</strong>. Membutuhkan verifikasi Admin/Atasan agar dapat dijalankan.
+                                atas nama <strong>{{ $ticket->requester->full_name }}</strong>. Membutuhkan verifikasi Admin/Atasan agar dapat dijalankan.
                             </p>
                         </div>
                     </div>

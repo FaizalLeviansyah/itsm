@@ -70,7 +70,7 @@
                 <td>{{ $ticket->category->name }}</td>
                 <td>{{ $ticket->priority->name }}</td>
                 <td>{{ ucfirst(str_replace('_',' ',$ticket->status)) }}</td>
-                <td>{{ $ticket->requester->name }}</td>
+                <td>{{ $ticket->requester->full_name }}</td>
                 <td>{{ $ticket->assignee->name ?? '-' }}</td>
                 <td>{{ $ticket->created_at->format('d/m/Y') }}</td>
                 <td>@if($ticket->sla_breached)<span class="badge badge-breach">BREACH</span>@else OK @endif</td>

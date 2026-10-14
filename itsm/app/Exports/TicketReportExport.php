@@ -52,7 +52,7 @@ class TicketReportExport implements FromCollection, WithHeadings, WithMapping, W
             $ticket->category->name,
             $ticket->priority->name,
             ucfirst(str_replace('_', ' ', $ticket->status)),
-            $ticket->requester->name,
+            $ticket->requester->full_name,
             $ticket->assignee->name ?? '-',
             $ticket->vessel_name ?? '-',
             $ticket->created_at->format('d/m/Y H:i'),

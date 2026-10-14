@@ -85,7 +85,7 @@
                         <p class="text-sm font-semibold text-brand-600">{{ $ticket->ticket_number }}</p>
                         <p class="text-xs text-gray-500">{{ Str::limit($ticket->title, 35) }}</p>
                     </td>
-                    <td class="px-6 py-3 text-sm text-gray-600">{{ $ticket->requester->name }}</td>
+                    <td class="px-6 py-3 text-sm text-gray-600">{{ $ticket->requester->full_name }}</td>
                     <td class="px-6 py-3">
                         <span class="flex items-center gap-1.5 text-xs font-medium">
                             <span class="w-2 h-2 rounded-full" style="background:{{ $ticket->priority->color }}"></span>{{ $ticket->priority->name }}

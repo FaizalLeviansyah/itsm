@@ -28,7 +28,6 @@ class SettingsController extends Controller
     }
 
     // User Management
-    // User Management
     public function users(Request $request)
     {
         $query = User::query();
@@ -44,7 +43,6 @@ class SettingsController extends Controller
             }
         }
 
-        // Filter berdasarkan PT (Company ID) disesuaikan dengan accessor/domain
         // Filter berdasarkan PT (Company ID)
         if ($request->has('company_id') && $request->company_id != '') {
             $companyId = $request->company_id;
@@ -65,7 +63,7 @@ class SettingsController extends Controller
                       ->orWhere('department', 'like', '%caraka%');
                 });
             } elseif ($companyId == '1') {
-                // PT Amarin Ship Management (Hanya email resmi perusahaan, mutlak tanpa gmail, caraka, dan acs)
+                // PT Amarin Ship Management
                 $query->where(function($q) {
                     $q->where('company_id', 1)
                       ->orWhere(function($subQ) {
@@ -83,14 +81,18 @@ class SettingsController extends Controller
             }
         }
 
+        // Pencarian menggunakan full_name & name secara fleksibel
         if ($request->has('search') && $request->search != '') {
-            $query->where(function ($q) use ($request) {
-                $q->where('name', 'like', "%{$request->search}%")
-                  ->orWhere('email', 'like', "%{$request->search}%");
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('full_name', 'like', "%{$search}%")
+                  ->orWhere('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
-        $users = $query->orderBy('name')->paginate(20);
+        // Urutkan berdasarkan full_name (Nama Lengkap)
+        $users = $query->orderBy('full_name')->paginate(20);
 
         // Count external users not yet synced
         $unsyncedCount = 0;
@@ -117,64 +119,65 @@ class SettingsController extends Controller
     }
 
     public function syncVessels()
-{
-    try {
-        $apiKey = env('MASTER_VESSEL_API_KEY', 'OJABxyAuodPWhds3S0YsPlbu40DTRAwe');
-        $vesselApiUrl = env('MASTER_VESSEL_API_URL', 'http://api.amarin.biz.id/api/v1/data/db_master_ship/vessel');
-        
-        $response = Http::withHeaders([
-            'X-API-Key' => $apiKey,
-            'Accept' => 'application/json',
-        ])->get($vesselApiUrl, [
-            'page' => 1,
-            'per_page' => 500,
-            'sort' => '-id',
-        ]);
+    {
+        try {
+            $apiKey = env('MASTER_VESSEL_API_KEY', 'OJABxyAuodPWhds3S0YsPlbu40DTRAwe');
+            $vesselApiUrl = env('MASTER_VESSEL_API_URL', 'http://api.amarin.biz.id/api/v1/data/db_master_ship/vessel');
+            
+            $response = Http::withHeaders([
+                'X-API-Key' => $apiKey,
+                'Accept' => 'application/json',
+            ])->get($vesselApiUrl, [
+                'page' => 1,
+                'per_page' => 500,
+                'sort' => '-id',
+            ]);
 
-        if ($response->successful()) {
-            $vessels = $response->json()['data'] ?? [];
-            foreach ($vessels as $vessel) {
-                $vesselName = $vessel['vessel_name'] ?? $vessel['name'] ?? null;
-                if (!$vesselName) continue;
+            if ($response->successful()) {
+                $vessels = $response->json()['data'] ?? [];
+                foreach ($vessels as $vessel) {
+                    $vesselName = $vessel['vessel_name'] ?? $vessel['name'] ?? null;
+                    if (!$vesselName) continue;
 
-                $email = $vessel['login_email'] ?? strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $vesselName)) . '@vessel.amarin.biz.id';
+                    $email = $vessel['login_email'] ?? strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $vesselName)) . '@vessel.amarin.biz.id';
 
-                User::updateOrCreate(
-                    ['email' => $email],
-                    [
-                        'name' => $vesselName,
-                        'password' => $vessel['login_password'] ?? $vessel['password'] ?? bcrypt('vesselpassword'),
-                        'role' => 'user',
-                        'department' => 'Vessel',
-                        'job_title' => 'Vessel',
-                        'position' => 'Vessel - ' . $vesselName,
-                        'source' => 'vessel_api',
-                        'source_id' => $vessel['id'] ?? null,
-                    ]
-                );
+                    User::updateOrCreate(
+                        ['email' => $email],
+                        [
+                            'name' => $vesselName,
+                            'full_name' => $vesselName,
+                            'password' => $vessel['login_password'] ?? $vessel['password'] ?? bcrypt('vesselpassword'),
+                            'role' => 'user',
+                            'department' => 'Vessel',
+                            'job_title' => 'Vessel',
+                            'position' => 'Vessel - ' . $vesselName,
+                            'source' => 'vessel_api',
+                            'source_id' => $vessel['id'] ?? null,
+                        ]
+                    );
+                }
+                return redirect()->back()->with('success', 'Vessels synchronized successfully.');
             }
-            return redirect()->back()->with('success', 'Vessels synchronized successfully.');
+
+            return redirect()->back()->with('error', 'Failed to fetch vessel data from API. Status: ' . $response->status());
+
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Failed to sync vessels: ' . $e->getMessage());
         }
-
-        return redirect()->back()->with('error', 'Failed to fetch vessel data from API. Status: ' . $response->status());
-
-    } catch (\Exception $e) {
-        return redirect()->back()->with('error', 'Failed to sync vessels: ' . $e->getMessage());
     }
-}
 
     public function updateUserRole(Request $request, User $user)
     {
         $request->validate(['role' => 'required|in:admin,technician,user']);
         $user->update(['role' => $request->role]);
-        return back()->with('success', "{$user->name}'s role changed to {$request->role}.");
+        return back()->with('success', "{$user->full_name}'s role changed to {$request->role}.");
     }
 
     public function toggleUserStatus(User $user)
     {
         $user->update(['is_active' => !$user->is_active]);
         $status = $user->is_active ? 'activated' : 'deactivated';
-        return back()->with('success', "User {$user->name} {$status} successfully.");
+        return back()->with('success', "User {$user->full_name} {$status} successfully.");
     }
 
     // Category Management

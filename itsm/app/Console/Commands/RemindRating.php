@@ -25,7 +25,7 @@ class RemindRating extends Command
         foreach ($tickets as $ticket) {
             $waService->notifyRatingReminder($ticket);
             $count++;
-            $this->info("Reminder sent: {$ticket->ticket_number} → {$ticket->requester->name}");
+            $this->info("Reminder sent: {$ticket->ticket_number} → {$ticket->requester->full_name}");
         }
 
         $this->info("Done. {$count} reminders sent.");

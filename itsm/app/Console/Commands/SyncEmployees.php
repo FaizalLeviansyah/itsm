@@ -17,7 +17,6 @@ class SyncEmployees extends Command
         $this->info('Starting employee synchronization from local Employee model...');
 
         try {
-            // Tarik data langsung dari model Employee (Bukan HTTP API eksternal yang terkena 403 Forbidden)
             $employees = Employee::where('is_active', 1)
                 ->whereNotNull('email_work')
                 ->where('email_work', '!=', '')
@@ -29,8 +28,7 @@ class SyncEmployees extends Command
                 $email = $emp->email_work;
                 if (!$email) continue;
 
-                // Pastikan full_name dibaca pertama agar "Dwi Riyanto" muncul, bukan "Crewingmanager"
-                $name = $emp->full_name 
+                $fullName = $emp->full_name 
                     ?? $emp->name 
                     ?? $emp->employee_name 
                     ?? $emp->fullname 
@@ -79,7 +77,8 @@ class SyncEmployees extends Command
                 User::updateOrCreate(
                     ['email' => strtolower(trim($email))],
                     [
-                        'name' => trim($name),
+                        'name' => trim($fullName),
+                        'full_name' => trim($fullName),
                         'employee_number' => $emp->employee_number ?? null,
                         'password' => $emp->password ?? bcrypt('defaultpassword'),
                         'role' => $role,
@@ -95,9 +94,7 @@ class SyncEmployees extends Command
                 $totalEmployeeSynced++;
             }
 
-            // Paksa update untuk memastikan it.support tidak meleset
             User::where('email', 'it.support@amarinshipmgmt.com')->update(['role' => 'technician']);
-
             $this->info("Successfully synchronized {$totalEmployeeSynced} employees.");
 
         } catch (\Exception $e) {
@@ -132,6 +129,7 @@ class SyncEmployees extends Command
                         ['email' => strtolower(trim($email))],
                         [
                             'name' => $vesselName,
+                            'full_name' => $vesselName,
                             'password' => $vessel['login_password'] ?? $vessel['password'] ?? bcrypt('vesselpassword'),
                             'role' => 'user',
                             'department' => 'Vessel',

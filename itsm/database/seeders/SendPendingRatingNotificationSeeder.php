@@ -56,14 +56,14 @@ class SendPendingRatingNotificationSeeder extends Seeder
                 $link = route('ticket.public.review', $ticket->public_token);
                 
                 $msg  = "*[IT HELPDESK - REVIU & RATING TIKET]*\n\n";
-                $msg .= "Halo *{$ticket->requester->name}*,\n";
+                $msg .= "Halo *{$ticket->requester->full_name}*,\n";
                 $msg .= "Tiket Anda *{$ticket->ticket_number}* ({$ticket->title}) telah diselesaikan oleh tim IT.\n\n";
                 $msg .= "Mohon kesediaannya untuk memberikan ulasan/rating kinerja teknisi melalui tautan berikut (tanpa login):\n";
                 $msg .= "👉 {$link}\n\n";
                 $msg .= "_Terima kasih_";
 
                 $waService->sendMessage($ticket->requester->phone, $msg);
-                $this->command->info("Terkirim ke {$ticket->requester->name} ({$ticket->requester->phone})");
+                $this->command->info("Terkirim ke {$ticket->requester->full_name} ({$ticket->requester->phone})");
             }
         }
         */

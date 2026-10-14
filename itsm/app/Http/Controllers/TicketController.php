@@ -523,7 +523,7 @@ class TicketController extends Controller
                     $techs = $ticket->assignedTechnicians->pluck('name')->join(', ') ?: ($ticket->assignee?->name ?? 'Tim IT');
 
                     $waMsg  = "⚠️ *[TICKET STATUS UPDATE - REOPENED BY TECH]* ⚠️\n\n";
-                    $waMsg .= "Dear *{$ticket->requester->name}*,\n\n";
+                    $waMsg .= "Dear *{$ticket->requester->full_name}*,\n\n";
                     $waMsg .= "Please **DISREGARD** the previous rating link. Your ticket *{$ticket->ticket_number}* (*{$ticket->title}*) has been moved back from *Resolved* to *" . strtoupper(str_replace('_', ' ', $request->status)) . "* by *{$techs}* for further adjustments/fixes.\n\n";
                     
                     if ($request->filled('resolution_notes')) {
@@ -570,7 +570,7 @@ class TicketController extends Controller
 
                     // --- TEKS WA UNTUK REQUESTER (FULL ENGLISH) ---
                     $waMessage  = "⚠️ *[YOUR PROBLEM SOLVED - TICKET RESOLVED - RATING REQUIRED]* ⚠️\n\n";
-                    $waMessage .= "Dear *{$ticket->requester->name}*,\n\n";
+                    $waMessage .= "Dear *{$ticket->requester->full_name}*,\n\n";
                     $waMessage .= "Your ticket *{$ticket->ticket_number}* (*{$ticket->title}*) has been **RESOLVED** by *{$techs}*.\n\n";
                     $waMessage .= "📋 *Initial Issue:*\n";
                     $waMessage .= "_{$ticket->description}_\n\n";

@@ -87,13 +87,8 @@
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-3">
                             @php
-                                $displayFullName = $user->name;
-                                // Jika nama masih berisi NIK/Angka, amankan dengan nama berbasis email/posisi
-                                if (preg_match('/^[P]?\d+$/', $displayFullName)) {
-                                    $displayFullName = !empty($user->position) && !preg_match('/^[P]?\d+$/', $user->position) 
-                                        ? $user->position 
-                                        : ucwords(str_replace(['.', '_'], ' ', explode('@', $user->email)[0]));
-                                }
+                                // Langsung gunakan full_name dari database, fallback ke name jika kosong
+                                $displayFullName = $user->full_name ?? $user->name ?? 'User';
                             @endphp
                             <div class="w-9 h-9 bg-brand-100 rounded-full flex items-center justify-center shadow-sm">
                                 <span class="text-xs font-bold text-brand-700">{{ strtoupper(substr($displayFullName, 0, 2)) }}</span>

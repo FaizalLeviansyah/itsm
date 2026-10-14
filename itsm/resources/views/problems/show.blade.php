@@ -62,7 +62,7 @@
                         <span class="text-sm font-mono text-brand-600">{{ $ticket->ticket_number }}</span>
                         <span class="text-sm text-gray-600 ml-2">{{ Str::limit($ticket->title, 40) }}</span>
                     </div>
-                    <span class="text-xs text-gray-400">{{ $ticket->requester->name }}</span>
+                    <span class="text-xs text-gray-400">{{ $ticket->requester->full_name }}</span>
                 </a>
                 @endforeach
             </div>

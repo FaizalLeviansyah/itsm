@@ -201,7 +201,7 @@
                     <td class="px-6 py-4 text-sm text-gray-600">{{ $ticket->category->name }}</td>
                     <td class="px-6 py-4">
                         @php
-                            $reqName = $ticket->requester->name ?? 'Unknown';
+                            $reqName = $ticket->requester->full_name ?? 'Unknown';
                         @endphp
                         <div class="flex items-center gap-2">
                             <div class="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center">

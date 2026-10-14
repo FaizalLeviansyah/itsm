@@ -95,4 +95,11 @@ class User extends Authenticatable
         // Selebihnya (termasuk semua yang pakai @gmail.com) masuk ke PT Amarin Crewing Services
         return \App\Models\Company::find(3) ?? (object)['name' => 'PT Amarin Crewing Services'];
     }
+
+    public function getNameAttribute($value)
+    {
+        return !empty($this->attributes['full_name']) 
+            ? $this->attributes['full_name'] 
+            : ($value ?? 'User');
+    }
 }

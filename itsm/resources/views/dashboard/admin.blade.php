@@ -161,9 +161,9 @@
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-2">
                             <div class="w-7 h-7 bg-gray-100 rounded-full flex items-center justify-center">
-                                <span class="text-[10px] font-bold text-gray-600">{{ strtoupper(substr($ticket->requester->name, 0, 2)) }}</span>
+                                <span class="text-[10px] font-bold text-gray-600">{{ strtoupper(substr($ticket->requester->full_name, 0, 2)) }}</span>
                             </div>
-                            <span class="text-sm text-gray-700">{{ $ticket->requester->name }}</span>
+                            <span class="text-sm text-gray-700">{{ $ticket->requester->full_name }}</span>
                         </div>
                     </td>
                     <td class="px-6 py-4">

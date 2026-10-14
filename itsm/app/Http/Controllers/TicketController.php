@@ -513,7 +513,6 @@ class TicketController extends Controller
             ]);
         }
 
-        // JIKA TEKNISI MENGUBAH STATUS DARI RESOLVED KEMBALI KE PROGRESS/OPEN (BATAL RESOLVED)
         if ($oldStatus === 'resolved' && in_array($request->status, ['in_progress', 'open', 'assigned'])) {
             $ticket->load(['requester', 'assignee', 'assignedTechnicians']);
             $requesterPhone = $ticket->requester?->phone;
@@ -523,7 +522,7 @@ class TicketController extends Controller
                     $techs = $ticket->assignedTechnicians->pluck('name')->join(', ') ?: ($ticket->assignee?->name ?? 'Tim IT');
 
                     $waMsg  = "⚠️ *[TICKET STATUS UPDATE - REOPENED BY TECH]* ⚠️\n\n";
-                    $waMsg .= "Dear *{$ticket->requester->full_name}*,\n\n";
+                    $waMsg .= "Dear *{$ticket->requester->name}*,\n\n";
                     $waMsg .= "Please **DISREGARD** the previous rating link. Your ticket *{$ticket->ticket_number}* (*{$ticket->title}*) has been moved back from *Resolved* to *" . strtoupper(str_replace('_', ' ', $request->status)) . "* by *{$techs}* for further adjustments/fixes.\n\n";
                     
                     if ($request->filled('resolution_notes')) {
@@ -541,9 +540,6 @@ class TicketController extends Controller
             }
         }
 
-        // =========================================================================
-        // PERBAIKAN UTAMA: KIRIM NOTIFIKASI WA RESOLVED LANGSUNG KE NOMOR REQUESTER
-        // =========================================================================
         if ($request->status === 'resolved') {
             if (empty(trim($request->resolution_notes))) {
                 return back()->with('error', 'Wajib memberikan catatan/komentar solusi sebelum menyelesaikan (Resolve) tiket.');
@@ -554,23 +550,16 @@ class TicketController extends Controller
 
             $ticket->load(['requester', 'assignee', 'assignedTechnicians']);
             
-            // Prioritaskan nomor telp dari requester, fallback ke WA_DEFAULT_TO jika requester kosong
-            $requesterPhone = $ticket->requester?->phone;
-            if (empty($requesterPhone) && $ticket->requester_id) {
-                // Ambil nomor fallback jika di DB bernilai null
-                $requesterPhone = env('WA_DEFAULT_TO', '628563339320');
-            }
+            $requesterPhone = $ticket->requester?->phone ?? env('WA_DEFAULT_TO', '628563339320');
+            $requesterName  = $ticket->requester?->name ?? 'User';
 
             if (!empty($requesterPhone)) {
                 try {
                     $publicLink = route('ticket.public.review', $ticket->public_token);
-                    
-                    // Format Nama Teknisi yang Mengerjakan
                     $techs = $ticket->assignedTechnicians->pluck('name')->join(', ') ?: ($ticket->assignee?->name ?? 'Tim IT');
 
-                    // --- TEKS WA UNTUK REQUESTER (FULL ENGLISH) ---
                     $waMessage  = "⚠️ *[YOUR PROBLEM SOLVED - TICKET RESOLVED - RATING REQUIRED]* ⚠️\n\n";
-                    $waMessage .= "Dear *{$ticket->requester->full_name}*,\n\n";
+                    $waMessage .= "Dear *{$requesterName}*,\n\n";
                     $waMessage .= "Your ticket *{$ticket->ticket_number}* (*{$ticket->title}*) has been **RESOLVED** by *{$techs}*.\n\n";
                     $waMessage .= "📋 *Initial Issue:*\n";
                     $waMessage .= "_{$ticket->description}_\n\n";
@@ -583,7 +572,6 @@ class TicketController extends Controller
                     $waMessage .= "*If the issue is NOT completely resolved, you can choose to REOPEN the ticket via the link above.*\n\n";
                     $waMessage .= "_Thank you for your cooperation!_";
 
-                    // Kirim pesan rating langsung ke WhatsApp Requester
                     $this->waService->sendMessage($requesterPhone, $waMessage);
                 } catch (\Exception $e) {
                     Log::error('Gagal mengirim WA Public Review ke Requester: ' . $e->getMessage());
@@ -609,10 +597,6 @@ class TicketController extends Controller
         $ticket->load(['assignee', 'requester', 'priority']);
 
         $this->notifyAdminViaWa($ticket, 'Status Changed to ' . strtoupper($request->status), $request->resolution_notes ?? '-');
-        // if ($request->status === 'resolved') {
-        //     $this->waService->notifyTicketResolved($ticket);
-        // }
-
         $this->sendStatusUpdateNotifications($ticket, $oldStatus, $request->status);
 
         return back()->with('success', 'Ticket status updated successfully.');
@@ -656,12 +640,8 @@ class TicketController extends Controller
         return back()->with('success', 'Comment and attachments added successfully.');
     }
 
-    public function reopen(Request $request, Ticket $ticket)
+   public function reopen(Request $request, Ticket $ticket)
     {
-        if ($ticket->requester_id !== Auth::id()) {
-            abort(403);
-        }
-
         if ($ticket->status !== 'resolved') {
             return back()->with('error', 'Hanya tiket dengan status Resolved yang dapat dibuka kembali.');
         }
@@ -673,29 +653,32 @@ class TicketController extends Controller
             'resolved_at' => null, 
         ]);
 
+        $ticket->load('requester');
+        $requesterName = $ticket->requester?->name ?? 'Requester';
+
         TicketHistory::create([
             'ticket_id' => $ticket->id,
-            'user_id' => Auth::id(),
+            'user_id' => $ticket->requester_id,
             'field' => 'status',
             'old_value' => 'resolved',
             'new_value' => 'in_progress',
-            'note' => 'Reopened oleh Requester: ' . $request->reason,
+            'note' => "Reopened oleh Requester ({$requesterName}): " . $request->reason,
         ]);
 
-        $this->notifyAdminViaWa($ticket, 'Ticket Reopened', 'Alasan: ' . $request->reason);
+        $this->notifyAdminViaWa($ticket, 'Ticket Reopened', 'Requester: ' . $requesterName . ' | Reason?: ' . $request->reason);
 
         if ($ticket->assignee) {
             $ticket->load(['requester', 'priority', 'assignee']);
             $this->waService->sendMessage(
                 $ticket->assignee->phone, 
-                "*[TICKET REOPENED]*\n\nTiket {$ticket->ticket_number} dibuka kembali oleh Requester dengan alasan:\n{$request->reason}\n\nStatus saat ini kembali menjadi *In Progress*."
+                "*[TICKET REOPENED]*\n\nTiket {$ticket->ticket_number} Open Back by Requester ({$requesterName}) With Reason:\n{$request->reason}\n\nStatus saat ini kembali menjadi *In Progress*."
             );
             $ticket->assignee->notify(new TicketNotification($ticket, 'reopened', $request->reason));
         }
 
         $this->sendStatusUpdateNotifications($ticket, 'resolved', 'in_progress');
 
-        return back()->with('success', 'Tiket belum selesai. Status dikembalikan ke In Progress dan Teknisi telah diberitahu.');
+        return back()->with('success', 'Ticket not Finished yet. Status Back to In Progress and Technician has been notified.');
     }
 
     public function getSubCategories($categoryId)
@@ -791,10 +774,6 @@ class TicketController extends Controller
 
     public function rateAndClose(Request $request, Ticket $ticket)
     {
-        if ($ticket->requester_id !== Auth::id()) {
-            abort(403, 'Unauthorized action.');
-        }
-
         if ($ticket->status !== 'resolved') {
             return back()->with('error', 'Hanya tiket dengan status Resolved yang dapat diulas dan ditutup.');
         }
@@ -804,8 +783,13 @@ class TicketController extends Controller
             'feedback' => 'nullable|string|max:1000'
         ]);
 
+        $ticket->load('requester');
+        $requesterId   = $ticket->requester_id;
+        $requesterName = $ticket->requester?->name ?? 'Requester';
+
+        // TERCATAT ATAS NAMA REQUESTER ASLI TIKET (BEBAS BENTROK AUTH)
         $ticket->rating()->create([
-            'user_id' => Auth::id(),
+            'user_id' => $requesterId, 
             'technician_id' => $ticket->assigned_to,
             'rating' => $request->rating,
             'feedback' => $request->feedback,
@@ -819,18 +803,18 @@ class TicketController extends Controller
 
         TicketHistory::create([
             'ticket_id' => $ticket->id,
-            'user_id' => Auth::id(),
+            'user_id' => $requesterId,
             'field' => 'status',
             'old_value' => 'resolved',
             'new_value' => 'closed',
-            'note' => 'Tiket diselesaikan oleh requester dengan rating: ' . $request->rating . ' Bintang',
+            'note' => "Tiket diselesaikan dan diulas oleh requester ({$requesterName}) dengan rating: " . $request->rating . ' Bintang',
         ]);
 
         try {
             $ticket->load(['assignee', 'rating']);
             
             $this->waService->notifyTicketClosed($ticket);
-            $this->notifyAdminViaWa($ticket, 'Ticket Closed & Rated', 'Rating: ' . $request->rating . '/5');
+            $this->notifyAdminViaWa($ticket, 'Ticket Closed & Rated', 'Requester: ' . $requesterName . ' | Rating: ' . $request->rating . '/5');
 
             if ($ticket->assignee) {
                 $ticket->assignee->notify(new TicketNotification($ticket, 'closed'));

@@ -59,30 +59,9 @@
 
             @elseif($ticket->status === 'resolved')
                 <!-- B. RESOLVED STATUS: RATING FORM & REOPEN OPTION -->
-                <div class="bg-blue-50/60 border border-blue-100 rounded-xl p-4 md:p-5">
-                    <h3 class="text-xs font-bold text-blue-900 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                        <i class="fas fa-check-circle text-blue-600"></i> Your Issue Has Been Resolved
-                    </h3>
-                    <p class="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{{ $ticket->resolution_notes ?? 'Technical work has been completed by our IT team.' }}</p>
-
-                    @php
-                        $techNames = collect();
-                        if ($ticket->assignedTechnicians && $ticket->assignedTechnicians->count() > 0) {
-                            $techNames = $ticket->assignedTechnicians->pluck('name');
-                        } elseif ($ticket->assignee) {
-                            $techNames->push($ticket->assignee->name);
-                        }
-                    @endphp
-                    <div class="mt-3 pt-3 border-t border-blue-100 text-xs text-gray-500 flex items-center gap-2">
-                        <i class="fas fa-user-check text-blue-600"></i> Handled by: 
-                        <span class="font-semibold text-gray-800">{{ $techNames->join(', ') ?: 'IT Support Team' }}</span>
-                    </div>
-                </div>
-
-                <!-- B. RESOLVED STATUS: RATING FORM & REOPEN OPTION -->
                 @php
-                    $assignedTechs =$ticket->assignedTechnicians;
-                    if ($assignedTechs->isEmpty() &&$ticket->assignee) {
+                    $assignedTechs = $ticket->assignedTechnicians;
+                    if ($assignedTechs->isEmpty() && $ticket->assignee) {
                         $assignedTechs = collect([$ticket->assignee]);
                     }
                 @endphp
@@ -98,7 +77,7 @@
                         <span class="font-semibold text-gray-800">{{ $assignedTechs->pluck('name')->join(', ') ?: 'IT Support Team' }}</span>
                     </div>
                 </div>
-
+                
                 <!-- Multi-Technician Rating Form -->
                 <form action="{{ route('ticket.public.submit', $ticket->public_token) }}" method="POST" id="review-form" class="space-y-6">
                     @csrf
@@ -106,7 +85,7 @@
 
                     <!-- GRID CARD TERPISAH DINAMIS UNTUK TIAP TEKNISI -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        @foreach($assignedTechs as$tech)
+                        @foreach($assignedTechs as $tech)
                             <div class="bg-white p-5 rounded-xl border border-blue-100 shadow-xs space-y-3">
                                 <div class="flex items-center gap-3 pb-3 border-b border-gray-100">
                                     <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">

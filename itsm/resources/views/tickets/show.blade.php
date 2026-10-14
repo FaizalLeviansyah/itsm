@@ -162,24 +162,35 @@
             }
         @endphp
 
-        @if($ticket->requester_id === Auth::id() && $ticket->status === 'resolved')
-            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 shadow-sm mb-6 space-y-5">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center font-bold text-lg shadow-md">
-                        <i class="fas fa-star"></i>
+            @if($ticket->requester_id === Auth::id() && $ticket->status === 'resolved')
+                <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 shadow-sm mb-6 space-y-5">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center font-bold text-lg shadow-md">
+                            <i class="fas fa-star"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold text-gray-900">Your Ticket Has Been Resolved</h3>
+                            <p class="text-xs text-gray-600">Please rate each assigned technician's performance below to officially close this ticket.</p>
+                        </div>
                     </div>
-                    <div>
-                        <h3 class="text-base font-bold text-gray-900">Your Ticket Has Been Resolved</h3>
-                        <p class="text-xs text-gray-600">Please rate each assigned technician's performance below to officially close this ticket.</p>
-                    </div>
-                </div>
 
-                @if(!$ticket->rating)
+                    @if($ticket->requester_id === Auth::id() && $ticket->status === 'resolved' && !$ticket->rating)
+                <!-- RATING FORM HANYA MUNCUL JIKA STATUS RESOLVED DAN BELUM ADA RATING -->
+                <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 shadow-sm mb-6 space-y-5">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center font-bold text-lg shadow-md">
+                            <i class="fas fa-star"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold text-gray-900">Your Ticket Has Been Resolved</h3>
+                            <p class="text-xs text-gray-600">Please rate each assigned technician's performance below to officially close this ticket.</p>
+                        </div>
+                    </div>
+
                     <!-- Multi-Technician Rating Form -->
                     <form action="{{ route('tickets.rateAndClose', $ticket) }}" method="POST" class="space-y-4">
                         @csrf
                         
-                        <!-- GRID CARD TERPISAH DINAMIS UNTUK TIAP TEKNISI -->
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             @foreach($assignedTechs as $tech)
                                 <div class="bg-white p-5 rounded-xl border border-blue-100 shadow-xs space-y-3">
@@ -193,7 +204,6 @@
                                         </div>
                                     </div>
 
-                                    <!-- Star Rating per Teknisi -->
                                     <div>
                                         <label class="block text-[11px] font-bold text-gray-700 mb-1">Rate Performance *</label>
                                         <div class="flex items-center gap-1" id="star-container-{{ $tech->id }}">
@@ -203,7 +213,6 @@
                                                         data-value="{{ $i }}">★</button>
                                             @endfor
                                         </div>
-                                        <!-- Input hidden dinamis per ID Teknisi -->
                                         <input type="hidden" name="ratings[{{ $tech->id }}]" id="rating-value-{{ $tech->id }}" required>
                                         <p id="rating-text-{{ $tech->id }}" class="text-[10px] font-semibold text-amber-600 mt-1 min-h-[14px]"></p>
                                     </div>
@@ -216,7 +225,6 @@
                             @endforeach
                         </div>
 
-                        <!-- Feedback Umum Tiket -->
                         <div class="bg-white p-4 rounded-xl border border-blue-100 shadow-xs">
                             <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Additional Overall Feedback (Optional)</label>
                             <textarea name="feedback" rows="2" class="w-full border border-gray-200 rounded-lg p-3 text-xs focus:ring-2 focus:ring-blue-500" placeholder="Write overall comments regarding the technical service..."></textarea>
@@ -246,19 +254,23 @@
                             </form>
                         </details>
                     </div>
-                @else
-                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
-                        <div class="text-2xl mb-1 text-amber-400">
+                </div>
+            @elseif($ticket->rating)
+                <!-- JIKA SUDAH ADA RATING / STATUS CLOSED, TAMPILKAN RINGKASAN SAJA (TIDAK ADA FORM) -->
+                <div class="bg-white rounded-xl border border-gray-100 p-5 mb-6 shadow-sm">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-amber-400 text-lg">
                             @for($i=1; $i<=5; $i++)
                                 {!! $i <= $ticket->rating->rating ? '★' : '<span class="text-gray-200">★</span>' !!}
                             @endfor
-                        </div>
-                        <p class="text-xs font-bold text-gray-800">You have rated this ticket!</p>
-                        @if($ticket->rating->feedback)
-                            <p class="text-xs text-gray-600 italic mt-1">"{{ $ticket->rating->feedback }}"</p>
-                        @endif
+                        </span>
+                        <span class="text-sm font-semibold text-gray-700">{{ $ticket->rating->rating }}/5 (Ticket Closed)</span>
                     </div>
-                @endif
+                    @if($ticket->rating->feedback)
+                        <p class="text-sm text-gray-600 italic">"{{ $ticket->rating->feedback }}"</p>
+                    @endif
+                </div>
+            @endif
             </div>
         @elseif($ticket->rating)
             <!-- RATING DISPLAY FOR NON-REQUESTER / CLOSED TICKET -->

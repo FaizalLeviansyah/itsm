@@ -499,6 +499,30 @@ class TicketController extends Controller
             }
         }
 
+        // ==========================================
+        // TAMBAHAN: AUTO-ASSIGN JIKA MASIH UNASSIGNED & YANG INTERAKSI ADMIN/TEKNISI
+        // ==========================================
+        if (empty($ticket->assigned_to) && $ticket->assignedTechnicians->isEmpty() && in_array(Auth::user()->role, ['admin', 'technician'])) {
+            $ticket->update([
+                'assigned_to' => Auth::id(),
+                'assigned_by' => Auth::id(),
+                'assigned_at' => now(),
+            ]);
+            
+            if (method_exists($ticket, 'assignedTechnicians')) {
+                $ticket->assignedTechnicians()->sync([Auth::id()]);
+            }
+
+            TicketHistory::create([
+                'ticket_id' => $ticket->id,
+                'user_id'   => Auth::id(),
+                'field'     => 'assigned_to',
+                'new_value' => Auth::user()->name,
+                'note'      => 'Auto-assigned based on first status update interaction',
+            ]);
+        }
+        // ==========================================
+
         $oldStatus = $ticket->status;
         $data = ['status' => $request->status];
 
@@ -612,7 +636,31 @@ class TicketController extends Controller
             'attachments.*.max' => 'Ukuran setiap file lampiran maksimal 20MB.'
         ]);
 
-            // 1. Simpan komentar/balasan
+        // ==========================================
+        // AUTO-ASSIGN JIKA MASIH UNASSIGNED & YANG KOMENTAR ADMIN/TEKNISI
+        // ==========================================
+        if (empty($ticket->assigned_to) && $ticket->assignedTechnicians->isEmpty() && in_array(Auth::user()->role, ['admin', 'technician'])) {
+            $ticket->update([
+                'assigned_to' => Auth::id(),
+                'assigned_by' => Auth::id(),
+                'assigned_at' => now(),
+            ]);
+
+            if (method_exists($ticket, 'assignedTechnicians')) {
+                $ticket->assignedTechnicians()->sync([Auth::id()]);
+            }
+
+            TicketHistory::create([
+                'ticket_id' => $ticket->id,
+                'user_id'   => Auth::id(),
+                'field'     => 'assigned_to',
+                'new_value' => Auth::user()->name,
+                'note'      => 'Auto-assigned based on first comment/reply interaction',
+            ]);
+        }
+        // ==========================================
+
+        // 1. Simpan komentar/balasan
         $comment = $ticket->comments()->create([
             'user_id' => auth()->id(),
             'comment' => $request->comment,
@@ -805,7 +853,7 @@ class TicketController extends Controller
         ]);
 
         $ticket->update([
-            'status' => 'closed',
+            'status'    => 'closed',
             'closed_at' => now(),
         ]);
 

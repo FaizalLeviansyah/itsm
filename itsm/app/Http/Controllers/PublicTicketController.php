@@ -52,7 +52,6 @@ class PublicTicketController extends Controller
             $ratingsArray = $request->input('ratings', []);
             $feedbacksArray = $request->input('feedbacks', []);
             
-            // Hitung rata-rata skor jika diperlukan untuk kolom tunggal 'rating' utama, atau ambil yang pertama
             $avgRating = count($ratingsArray) > 0 ? array_sum($ratingsArray) / count($ratingsArray) : 5;
             $firstTechId = array_key_first($ratingsArray) ?? $ticket->assigned_to;
             $firstFeedback = isset($feedbacksArray[$firstTechId]) ? $feedbacksArray[$firstTechId] : $request->feedback;
@@ -68,17 +67,23 @@ class PublicTicketController extends Controller
                 ]
             );
 
+            // AUTO UPDATE STATUS TIKET MENJADI CLOSED
+            $ticket->update([
+                'status'    => 'closed',
+                'closed_at' => now(),
+            ]);
+
             TicketHistory::create([
                 'ticket_id' => $ticket->id,
                 'user_id'   => $ticket->requester_id,
                 'field'     => 'status',
                 'old_value' => 'resolved',
                 'new_value' => 'closed',
-                'note'      => 'Rated via Public Review Link: ' . round($avgRating) . ' Stars',
+                'note'      => 'Rated via Public Review Link & Ticket Closed: ' . round($avgRating) . ' Stars',
             ]);
 
             return back()->with('success', 'Thank you! Your rating has been saved and the ticket is now officially Closed.');
-        } 
+        }
         
         // ==========================================
         // 2. SKENARIO AKSI: REOPEN TICKET BY REQUESTER

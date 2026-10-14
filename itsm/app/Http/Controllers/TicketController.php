@@ -844,11 +844,25 @@ class TicketController extends Controller
         $firstTechId = array_key_first($ratingsArray) ?? $ticket->assigned_to;
         $firstFeedback = isset($feedbacksArray[$firstTechId]) ? $feedbacksArray[$firstTechId] : $request->feedback;
 
+        // Susun detail rating per teknisi untuk disimpan ke kolom feedback atau relasi
+        $detailedFeedbackArr = [];
+        foreach ($ratingsArray as $techId => $score) {
+            $techModel = User::find($techId);
+            $techName = $techModel ? $techModel->name : 'Technician';
+            $techComment = $feedbacksArray[$techId] ?? 'No comment';
+            $detailedFeedbackArr[] = "{$techName}: {$score}/5 Stars (Note: {$techComment})";
+        }
+        
+        $combinedFeedback = implode(" | ", $detailedFeedbackArr);
+        if (!empty($request->feedback)) {
+            $combinedFeedback .= " [Overall: " . $request->feedback . "]";
+        }
+
         $ticket->rating()->create([
             'user_id'                 => $requesterId, 
-            'technician_id'           => $firstTechId,
+            'technician_id'           => $firstTechId, // Teknisi utama
             'rating'                  => round($avgRating),
-            'feedback'                => $request->feedback ?? $firstFeedback,
+            'feedback'                => $combinedFeedback,
             'resolution_time_minutes' => $ticket->resolution_time,
         ]);
 

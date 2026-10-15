@@ -381,18 +381,19 @@ class TicketController extends Controller
         $this->authorizeTicketAccess($ticket);
 
         $ticket->load([
-        'requester',
-        'assignee',
-        'priority',
-        'category',
-        'company',
-        'attachments' => function ($q) {
-            $q->whereNull('ticket_comment_id');
-        },
-        'comments.user',
-        'comments.attachments' // Supaya lampiran chat dipanggil lewat relasi komentar saja
-    ]);
+            'requester',
+            'assignee',
+            'priority',
+            'category',
+            'company',
+            'attachments' => function ($q) {
+                $q->whereNull('ticket_comment_id');
+            },
+            'comments.user',
+            'comments.attachments'
+        ]);
 
+        $vendors = \App\Models\Vendor::where('is_active', true)->orderBy('name')->get();
         $technicians = User::whereIn('role', ['technician', 'admin'])->where('is_active', true)->get();
 
         $cannedResponses = [];
@@ -406,7 +407,7 @@ class TicketController extends Controller
                 ->get();
         }
 
-        return view('tickets.show', compact('ticket', 'technicians', 'cannedResponses'));
+        return view('tickets.show', compact('ticket', 'technicians', 'cannedResponses', 'vendors'));
     }
 
    public function assign(Request $request, Ticket $ticket)

@@ -24,6 +24,7 @@ use App\Http\Controllers\VesselDashboardController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schedule;
 use App\Http\Controllers\PublicTicketController;
+use App\Http\Controllers\VendorController;
 
 // Public Ticket Review & Rating (Tanpa Auth)
 Route::get('/ticket/review/{token}', [PublicTicketController::class, 'show'])->name('ticket.public.review');
@@ -224,6 +225,9 @@ Route::middleware('auth')->group(function () {
         Route::delete('/settings/auto-assign/{rule}', [SettingsController::class, 'destroyAutoAssign'])->name('settings.auto-assign.destroy');
         Route::delete('/settings/canned-responses/{response}', [SettingsController::class, 'destroyCannedResponse'])->name('settings.canned-responses.destroy');
         Route::delete('/settings/maintenance/{schedule}', [SettingsController::class, 'destroyMaintenance'])->name('settings.maintenance.destroy');
+
+        // ---> TAMBAHKAN RESOURCE VENDORS DI SINI <---
+        Route::resource('vendors', VendorController::class);
     });
 
     // Bulk Ticket Actions

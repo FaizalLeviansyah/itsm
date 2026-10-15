@@ -771,7 +771,7 @@
                 <p class="text-[11px] text-brand-600 font-medium">💡 Tips: Anda dapat memilih lebih dari 1 teknisi untuk penugasan kolaboratif (independent).</p>
             </div>
             
-            <select name="assigned_to[]" {{ Auth::user()->role === 'admin' ? 'multiple="multiple"' : '' }} required class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm mb-4 select2-multiple">
+           <select name="assigned_to[]" {{ Auth::user()->role === 'admin' ? 'multiple="multiple"' : '' }} required class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm mb-3 select2-multiple">
                 @if(Auth::user()->role === 'admin')
                     @foreach($technicians as $tech)
                     <option value="{{ $tech->id }}" {{ $ticket->assignedTechnicians->contains($tech->id) ? 'selected' : '' }}>{{ $tech->name }} ({{ ucfirst($tech->role) }})</option>
@@ -784,7 +784,18 @@
                 @endif
             </select>
 
-            <textarea name="note" rows="2" class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm mb-4" placeholder="{{ Auth::user()->role === 'admin' ? 'Catatan / Alasan Assign (Opsional)...' : 'Alasan eskalasi ke Admin (Wajib diisi jika perlu)...' }}"></textarea>
+            <!-- DROPDOWN VENDOR -->
+            <div class="mb-3">
+                <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Delegasikan ke Vendor (Opsional)</label>
+                <select name="vendor_id" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+                    <option value="">-- Tanpa Vendor Eksternal (Internal IT) --</option>
+                    @foreach($vendors as $v)
+                        <option value="{{ $v->id }}" {{ $ticket->vendor_id == $v->id ? 'selected' : '' }}>{{ $v->name }} ({{ $v->code }})</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <textarea name="note" rows="2" class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm mb-4" placeholder="Catatan..."></textarea>
 
             <div class="flex justify-end gap-2">
                 <button type="button" onclick="document.getElementById('assign-modal').classList.add('hidden')" class="px-4 py-2 border border-gray-200 rounded-lg text-sm">Cancel</button>

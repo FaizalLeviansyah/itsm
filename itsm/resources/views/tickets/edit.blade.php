@@ -8,9 +8,26 @@
     <span class="text-brand-600 font-medium">Edit</span>
 </div>
 
-<div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">Edit Ticket</h1>
-    <p class="text-sm text-gray-500 mt-1">Update your ticket information.</p>
+<div class="mb-6 flex items-center justify-between">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">Edit Ticket {{ $ticket->ticket_number }}</h1>
+        <p class="text-sm text-gray-500 mt-1">Update ticket details for Requester: <strong class="text-gray-800">{{ $ticket->requester->name ?? 'Unknown' }}</strong></p>
+    </div>
+    @php
+        $editComp = $ticket->company->name ?? ($ticket->requester->company->name ?? 'PT Amarin Ship Management');
+        $editLower = strtolower($editComp);
+        $editColor = 'bg-blue-50 text-blue-700 border-blue-200';
+        if ($ticket->vendor || str_contains($editLower, 'vendor')) {
+            $editColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        } elseif (str_contains($editLower, 'caraka')) {
+            $editColor = 'bg-red-50 text-red-700 border-red-200';
+        } elseif (str_contains($editLower, 'crewing')) {
+            $editColor = 'bg-amber-50 text-amber-700 border-amber-200';
+        }
+    @endphp
+    <span class="px-3 py-1 rounded-lg text-xs font-bold border {{ $editColor }}">
+        Company: {{ $editComp }}
+    </span>
 </div>
 
 <div class="max-w-3xl">

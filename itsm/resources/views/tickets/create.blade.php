@@ -1,6 +1,22 @@
 @extends('layouts.app')
 @section('title', 'Create New Ticket')
 
+@push('styles')
+<!-- Select2 CSS CDN -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<style>
+    /* Custom Styling Select2 agar serasi dengan Tailwind UI */
+    .select2-container--default .select2-selection--single {
+        border-color: #fcd34d !important;
+        border-width: 2px !important;
+        border-radius: 0.5rem !important;
+        height: 42px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+</style>
+@endpush
+
 @section('content')
 <!-- Breadcrumb -->
 <div class="flex items-center gap-2 text-sm text-gray-500 mb-2">
@@ -32,16 +48,20 @@
                                 <option value="all" class="bg-white text-gray-800 font-normal">📁 Semua User</option>
                                 <option value="office" class="bg-white text-gray-800 font-normal">🏢 Office (On-Shore)</option>
                                 <option value="vessel" class="bg-white text-gray-800 font-normal">🚢 Vessel (Off-Shore)</option>
+                                <option value="vendor" class="bg-white text-gray-800 font-normal">🤝 Vendor / Third-Party</option>
                             </select>
                         </div>
                         
                        <!-- On Behalf Select (Dengan event Listener onchange) -->
-                        <select name="requester_id" id="on_behalf_select" onchange="updateOnBehalfCompany(this)" class="w-full border border-amber-300 rounded-lg px-4 py-2.5 text-sm bg-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500">
-                            <option value="" data-location="all" data-company="{{ auth()->user()->company->name ?? 'PT Amarin Ship Management' }}">-- Buat Tiket Untuk Diri Sendiri ({{ auth()->user()->name }}) --</option>
+                        <!-- On Behalf Select dengan Search Box Select2 -->
+                        <select name="requester_id" id="on_behalf_select" class="w-full select2-searchable">
+                            <option value="" data-location="all" data-company="{{ auth()->user()->company->name ?? 'PT Amarin Ship Management' }}" data-requester-name="{{ auth()->user()->name }}" data-is-vendor="false" data-user-type="Office Employee">-- Buat Tiket Untuk Diri Sendiri ({{ auth()->user()->name }}) --</option>
                             @foreach(\App\Models\User::where('id', '!=', auth()->id())->where('is_active', true)->orderBy('name')->get() as $u)
                                 @php
+                                    $isVendor = str_contains(strtolower($u->email), 'vendor') || ($u->company && str_contains(strtolower($u->company->name), 'vendor')) || str_contains(strtolower($u->position ?? ''), 'vendor');
                                     $isVessel = str_contains(strtolower($u->name), 'mt ') || str_contains(strtolower($u->email), 'vessel') || str_contains(strtolower($u->position ?? ''), 'vessel');
-                                    $locationType = $isVessel ? 'vessel' : 'office';
+                                    
+                                    $locationType = $isVendor ? 'vendor' : ($isVessel ? 'vessel' : 'office');
                                     
                                     $displayName = $u->name;
                                     if (preg_match('/^[P]?\d+$/', $displayName)) {
@@ -62,22 +82,23 @@
                                     }
                                     $optionText .= ' [' . $companyName . ']';
                                 @endphp
-                                <option value="{{ $u->id }}" data-location="{{ $locationType }}" data-company="{{ $companyName }}" {{ old('requester_id') == $u->id ? 'selected' : '' }}>
+                                <option value="{{ $u->id }}" data-location="{{ $locationType }}" data-company="{{ $companyName }}" data-requester-name="{{ $displayName }}" data-is-vendor="{{ $isVendor ? 'true' : 'false' }}" data-user-type="{{ $isVendor ? 'Vendor / External Partner' : ($isVessel ? 'Vessel Crew' : 'Office Employee') }}" {{ old('requester_id') == $u->id ? 'selected' : '' }}>
                                     {{ $optionText }}
                                 </option>
                             @endforeach
                         </select>
 
                         <!-- Sidebar Additional Info Company (Dinamis dengan ID display_company_text) -->
-                        <div class="mb-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Dari Perusahaan : </label>
-                            <p class="text-sm font-semibold text-brand-600" id="display_company_text">
+                        <!-- Kotak Informasi PT di bawah dropdown On Behalf -->
+                        <div class="mt-3 bg-white/90 p-2.5 rounded-lg border border-amber-200">
+                            <span class="text-[11px] font-medium text-amber-900">From Company : </span>
+                            <span class="text-xs font-bold text-brand-600 company-display-text">
                                 {{ auth()->user()->company->name ?? 'PT Amarin Ship Management' }}
-                            </p>
+                            </span>
                         </div>
                         
                         <p class="text-[11px] text-amber-800 font-medium mt-2">
-                            💡 *Tip: Ketik nama, email, atau jabatan untuk mencari cepat. Tiket atas nama user lain akan memerlukan <strong>Approval</strong>.*
+                            💡 *Tip: Type a name, email address, or job title to perform a quick search. Tickets under another user's name will require <strong>Approval</strong>.*
                         </p>
                     </div>
                 @endif
@@ -191,14 +212,51 @@
             <div class="bg-white rounded-xl border border-gray-100 p-5">
                 <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Additional Info</h4>
                 
-                <!-- Sidebar Additional Info Company (Dinamis dengan ID display_company_text) -->
-                <div class="mb-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Dari Perusahaan : </label>
-                    <p class="text-sm font-semibold text-brand-600" id="display_company_text">
-                        {{ auth()->user()->company->name ?? 'PT Amarin Ship Management' }}
-                    </p>
+                <!-- Sidebar Additional Info (Full Adaptive UX CLEAR) -->
+                <!-- Sidebar Additional Info (English UI & Full Requester Info) -->
+                <div class="mb-4 bg-gray-50 p-3.5 rounded-lg border border-gray-200 space-y-3">
+                    <!-- Requester Name -->
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-0.5">Ticket Requester :</label>
+                        <p class="text-sm font-bold text-gray-900" id="display_requester_name">
+                            {{ request('requester_id') ? \App\Models\User::find(request('requester_id'))?->name : auth()->user()->name }}
+                        </p>
+                    </div>
+
+                    <!-- Requester Company -->
+                    <div class="pt-2 border-t border-gray-200/80">
+                        <label class="block text-xs font-medium text-gray-500 mb-0.5">From Company :</label>
+                        <p class="text-sm font-bold text-brand-600 company-display-text">
+                            {{ auth()->user()->company->name ?? 'PT Amarin Ship Management' }}
+                        </p>
+                    </div>
+
+                    <!-- Requester Type Badge -->
+                    <div class="flex items-center justify-between pt-2 border-t border-gray-200/80">
+                        <span class="text-xs text-gray-500">Requester Category :</span>
+                        <span id="requester_type_badge" class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                            <i class="fas fa-user-check text-[10px]"></i> Office Employee
+                        </span>
+                    </div>
+
+                    <!-- IT Staff Logged / Created By (Only shown when Admin/Tech logs On-Behalf) -->
+                    @if(in_array(auth()->user()->role, ['admin', 'technician']))
+                    <div class="pt-2 border-t border-gray-200/80">
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                            <i class="fas fa-user-shield text-brand-600"></i> CREATED BY (IT OFFICER):
+                        </label>
+                        <div class="flex items-center gap-2 bg-white p-2 rounded border border-gray-200 shadow-xs">
+                            <div class="w-7 h-7 bg-brand-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold">
+                                {{ strtoupper(substr(auth()->user()->name, 0, 2)) }}
+                            </div>
+                            <div class="text-xs">
+                                <span class="font-bold text-gray-900 block">{{ auth()->user()->name }}</span>
+                                <span class="text-[10px] text-brand-600 font-semibold block capitalize">IT {{ auth()->user()->role === 'admin' ? 'Administrator' : 'Technician' }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    @endif
                 </div>
-                <!-- AKHIR BAGIAN YANG DITAMBAHKAN -->
 
                 <div class="space-y-4">
                     <div>
@@ -274,8 +332,23 @@
 @endsection
 
 @push('scripts')
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 let selectedFiles = [];
+
+// Inisialisasi Select2 dengan Search Box Instan & Real-time Color Update
+$(document).ready(function() {
+    const $select = $('#on_behalf_select').select2({
+        placeholder: "-- Type name, email, or job title to search --",
+        allowClear: true,
+        width: '100%'
+    });
+
+    $select.on('change', function() {
+        updateOnBehalfCompany(this);
+    });
+});
 
 function previewFiles() {
     const input = document.getElementById('file-upload');
@@ -291,11 +364,49 @@ function previewFiles() {
 
 function updateOnBehalfCompany(selectEl) {
     const selectedOption = selectEl.options[selectEl.selectedIndex];
-    const companyName = selectedOption.getAttribute('data-company') || "{{ auth()->user()->company->name ?? 'PT Amarin Ship Management' }}";
-    
-    const displayEl = document.getElementById('display_company_text');
-    if (displayEl) {
-        displayEl.innerText = companyName;
+    if (!selectedOption) return;
+
+    const companyName   = selectedOption.getAttribute('data-company') || "PT Amarin Ship Management";
+    const requesterName = selectedOption.getAttribute('data-requester-name') || "{{ auth()->user()->name }}";
+    const isVendor      = selectedOption.getAttribute('data-is-vendor') === 'true';
+    const userType      = selectedOption.getAttribute('data-user-type') || 'Office Employee';
+
+    // 1. Update Nama Requester di Sidebar
+    const requesterDisplay = document.getElementById('display_requester_name');
+    if (requesterDisplay) {
+        requesterDisplay.innerText = requesterName;
+    }
+
+    // 2. Update Warna Nama Perusahaan (Amarin=Biru, Crewing=Kuning, Caraka=Merah, Vendor=Hijau)
+    document.querySelectorAll('.company-display-text').forEach(el => {
+        el.innerText = companyName;
+        el.classList.remove('text-brand-600', 'text-blue-600', 'text-amber-500', 'text-red-600', 'text-emerald-600');
+        
+        const lowerComp = companyName.toLowerCase();
+        if (isVendor || lowerComp.includes('vendor')) {
+            el.classList.add('text-emerald-600');
+        } else if (lowerComp.includes('caraka')) {
+            el.classList.add('text-red-600');
+        } else if (lowerComp.includes('crewing')) {
+            el.classList.add('text-amber-500');
+        } else {
+            el.classList.add('text-blue-600');
+        }
+    });
+
+    // 3. Update Badge Requester Category
+    const badgeEl = document.getElementById('requester_type_badge');
+    if (badgeEl) {
+        if (isVendor) {
+            badgeEl.className = 'inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs animate-pulse';
+            badgeEl.innerHTML = '<i class="fas fa-handshake text-[10px]"></i> ' + userType;
+        } else if (userType.includes('Vessel')) {
+            badgeEl.className = 'inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 shadow-xs';
+            badgeEl.innerHTML = '<i class="fas fa-ship text-[10px]"></i> ' + userType;
+        } else {
+            badgeEl.className = 'inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 shadow-xs';
+            badgeEl.innerHTML = '<i class="fas fa-user-check text-[10px]"></i> ' + userType;
+        }
     }
 }
 

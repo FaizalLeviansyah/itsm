@@ -212,8 +212,9 @@ class TicketController extends Controller
         }
 
         $companies = Company::where('is_active', true)->orderBy('name')->get(); 
+        $vendors = \App\Models\Vendor::all(); // Load data vendor
 
-        return view('tickets.create', compact('categories', 'priorities', 'assets', 'companies', 'users'));
+        return view('tickets.create', compact('categories', 'priorities', 'assets', 'companies', 'users', 'vendors'));
     }
 
     public function store(Request $request)
@@ -250,8 +251,8 @@ class TicketController extends Controller
             $actualRequesterId = $request->requester_id;
             $requestedUser = \App\Models\User::find($request->requester_id);
             if ($requestedUser) {
-                // SESUAI PERMINTAAN MAS HENDRI: Ambil langsung Company ID milik Karyawan yang On Behalf!
-                $actualCompanyId = $requestedUser->company_id;
+                // Ambil Company ID langsung dari relasi atau property company_id milik requester
+                $actualCompanyId = $requestedUser->company_id ?? ($requestedUser->company?->id ?? Auth::user()->company_id);
             }
             $isOnBehalf = true;
         }
@@ -277,6 +278,7 @@ class TicketController extends Controller
             'public_token'  => Str::random(40),
             'title'         => $validatedData['title'],
             'description'   => $validatedData['description'],
+            'vendor_id'     => $request->vendor_id ?? null, // Simpan Vendor ID
             'category_id'   => $validatedData['category_id'],
             'sub_category_id' => $validatedData['sub_category_id'] ?? null,
             'priority_id'   => $validatedData['priority_id'],
@@ -817,8 +819,9 @@ class TicketController extends Controller
 
         $categories = Category::with('subCategories')->where('is_active', true)->get();
         $priorities = Priority::orderBy('sort_order')->get();
+        $vendors = \App\Models\Vendor::all(); // Load data vendor untuk edit
 
-        return view('tickets.edit', compact('ticket', 'categories', 'priorities'));
+        return view('tickets.edit', compact('ticket', 'categories', 'priorities', 'vendors'));
     }
 
     public function update(Request $request, Ticket $ticket)
@@ -833,7 +836,7 @@ class TicketController extends Controller
         ]);
 
         // Pastikan field status tidak tersentuh sama sekali saat update data umum
-        $ticket->update($request->only(['title', 'description', 'category_id', 'priority_id', 'impact', 'location', 'vessel_name']));
+        $ticket->update($request->only(['title', 'description', 'category_id', 'priority_id', 'vendor_id', 'impact', 'location', 'vessel_name']));
 
         TicketHistory::create([
             'ticket_id' => $ticket->id,
@@ -987,11 +990,13 @@ class TicketController extends Controller
         if ($user->role === 'user') {
             $query->where('requester_id', $user->id);
         } elseif ($user->role === 'technician' || $user->role === 'admin') {
+            // My Tickets menampilkan tiket yang di-assign ke teknisi tersebut ATAU yang dibuat oleh mereka
             $query->where(function($q) use ($user) {
                 $q->where('assigned_to', $user->id)
                   ->orWhereHas('assignedTechnicians', function($t) use ($user) {
                       $t->where('user_id', $user->id);
-                  });
+                  })
+                  ->orWhere('requester_id', $user->id);
             });
         }
 

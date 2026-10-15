@@ -263,19 +263,35 @@
                     </td>
                     <td class="px-6 py-4">
                         @php
-                            // Mengambil data perusahaan dari relasi ticket->company atau dari requester->company
                             $companyObj = $ticket->company ?? ($ticket->requester->company ?? null);
                             $companyName = is_object($companyObj) ? ($companyObj->name ?? '-') : ($companyObj ?? '-');
+                            $lowerComp = strtolower($companyName);
+                            
+                            $colorClass = 'text-blue-600';
+                            if ($ticket->vendor || str_contains($lowerComp, 'vendor')) {
+                                $colorClass = 'text-emerald-600';
+                            } elseif (str_contains($lowerComp, 'caraka')) {
+                                $colorClass = 'text-red-600';
+                            } elseif (str_contains($lowerComp, 'crewing')) {
+                                $colorClass = 'text-amber-500';
+                            }
                         @endphp
-                        <div class="flex items-center gap-2">
-                            <div class="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center">
-                                <span class="text-[9px] font-bold text-gray-600">
-                                    {{ $companyName !== '-' ? strtoupper(substr($companyName, 0, 2)) : '-' }}
+                        <div class="flex flex-col gap-0.5">
+                            <div class="flex items-center gap-2">
+                                <div class="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center">
+                                    <span class="text-[9px] font-bold {{ $colorClass }}">
+                                        {{ $companyName !== '-' ? strtoupper(substr($companyName, 0, 2)) : '-' }}
+                                    </span>
+                                </div>
+                                <span class="text-sm font-bold {{ $colorClass }}">
+                                    {{ Str::limit($companyName, 18) }}
                                 </span>
                             </div>
-                            <span class="text-sm text-gray-700">
-                                {{ Str::limit($companyName, 15) }}
-                            </span>
+                            @if($ticket->vendor)
+                                <span class="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded w-max mt-0.5">
+                                    <i class="fas fa-handshake text-[9px]"></i> {{ Str::limit($ticket->vendor->name, 14) }}
+                                </span>
+                            @endif
                         </div>
                     </td>
                     <td class="px-6 py-4">

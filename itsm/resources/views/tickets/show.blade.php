@@ -525,13 +525,39 @@
                 </div>
             </div>
             
-            <div class="space-y-2 text-sm pt-3 border-t border-gray-100">
+           <div class="space-y-2 text-sm pt-3 border-t border-gray-100">
+                @php
+                    $compName = $ticket->company->name ?? ($reqUser?->company?->name ?? 'PT Amarin Ship Management');
+                    $lowerName = strtolower($compName);
+                    
+                    $compColor = 'text-blue-600';
+                    if ($ticket->vendor || str_contains($lowerName, 'vendor')) {
+                        $compColor = 'text-emerald-600';
+                    } elseif (str_contains($lowerName, 'caraka')) {
+                        $compColor = 'text-red-600';
+                    } elseif (str_contains($lowerName, 'crewing')) {
+                        $compColor = 'text-amber-500';
+                    }
+                @endphp
                 <div class="flex justify-between items-center">
                     <span class="text-gray-500 text-xs">From Company</span>
-                    <span class="text-gray-800 font-semibold text-xs text-right">
-                        {{ $ticket->company->name ?? ($reqUser?->company?->name ?? 'PT Amarin Ship Management') }}
+                    <span class="font-bold text-xs text-right {{ $compColor }}">
+                        {{ $compName }}
                     </span>
                 </div>
+
+                <!-- Informasi Vendor / Third-Party yang Menangani Tiket -->
+                @if($ticket->vendor)
+                <div class="flex justify-between items-center bg-purple-50 px-2.5 py-2 rounded-lg border border-purple-200 my-2">
+                    <span class="text-purple-700 text-xs font-bold flex items-center gap-1.5">
+                        <i class="fas fa-handshake text-purple-600"></i> Vendor / 3rd Party
+                    </span>
+                    <span class="text-purple-900 font-bold text-xs text-right">
+                        {{ $ticket->vendor->name }}
+                    </span>
+                </div>
+                @endif
+                
                 @if($reqUser?->department)
                 <div class="flex justify-between">
                     <span class="text-gray-500 text-xs">Department</span>

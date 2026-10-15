@@ -153,7 +153,7 @@
         </div>
 
         <!-- ========================================== -->
-        <!-- RATING & REOPEN CONTAINER (SUDAH DIPERBAIKI & DIRAPIKAN) -->
+        <!-- RATING & REOPEN CONTAINER (DENGAN DECODER MULTI-TEKNISI) -->
         <!-- ========================================== -->
         @php
             $assignedTechs = $ticket->assignedTechnicians;
@@ -244,8 +244,28 @@
                 </div>
             </div>
 
-       @elseif($ticket->rating)
-            <!-- RATING DISPLAY (Mendukung data multi-teknisi dengan layout Grid/Berjejer) -->
+        @elseif($ticket->rating)
+            <!-- RATING DISPLAY MULTI-TEKNISI BERJEJER (GRID RESPONSIVE) -->
+            @php
+                $rawFeedback = $ticket->rating->feedback ?? '';
+                
+                // Ambil daftar teknisi yang ditugaskan di tiket ini
+                $displayTechs = $ticket->assignedTechnicians;
+                if ($displayTechs->isEmpty() && $ticket->assignee) {
+                    $displayTechs = collect([$ticket->assignee]);
+                }
+                if ($displayTechs->isEmpty() && $ticket->rating->technician) {
+                    $displayTechs = collect([$ticket->rating->technician]);
+                }
+
+                // Cek apakah ada Overall Feedback tambahan di bagian akhir string
+                $overallFeedback = null;
+                if (str_contains($rawFeedback, 'Overall Feedback:')) {
+                    $parts = explode('Overall Feedback:', $rawFeedback);
+                    $overallFeedback = trim(end($parts));
+                }
+            @endphp
+
             <div class="bg-white rounded-xl border border-blue-100 p-5 mb-6 shadow-sm space-y-4">
                 <div class="flex items-center justify-between border-b border-gray-100 pb-3">
                     <div class="flex items-center gap-2">
@@ -262,37 +282,80 @@
                     </span>
                 </div>
 
-                <!-- Detail Performa Teknisi (Layout Grid: 1 Kolom di HP, 2 Kolom di Laptop) -->
+                <!-- Detail Performa Teknisi (Layout Grid Responsive) -->
+                <!-- Detail Performa Teknisi (Layout Grid Responsive) -->
                 <div class="space-y-2">
                     <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Technician Performance Review:</p>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div class="bg-gray-50 p-3.5 rounded-xl border border-gray-100 space-y-3">
-                            <div class="flex items-center justify-between">
-                                <span class="text-xs font-bold text-gray-800 flex items-center gap-1.5">
-                                    <i class="fas fa-user-shield text-blue-600"></i> 
-                                    {{ $ticket->rating->technician->name ?? ($ticket->assignee->name ?? 'IT Support Team') }}
-                                </span>
-                                <span class="text-amber-400 text-sm font-bold flex items-center gap-1">
-                                    @for($i=1; $i<=5; $i++)
-                                        {!! $i <= $ticket->rating->rating ? '★' : '<span class="text-gray-200">★</span>' !!}
-                                    @endfor
-                                    <span class="text-gray-700 text-xs ml-1 font-semibold">{{ $ticket->rating->rating }}/5</span>
-                                </span>
-                            </div>
+                        @foreach($displayTechs as $tech)
+                            @php
+                                $techName = $tech->name;
+                                $techRatingValue = $ticket->rating->rating ?? 5;
+                                $techNote = null;
 
-                            @if($ticket->rating->feedback)
-                                <div class="text-xs text-gray-700 bg-white p-3 rounded-lg border border-gray-100 space-y-1">
-                                    <p class="font-semibold text-[11px] text-gray-400 uppercase">Ulasan / Feedback:</p>
-                                    <p class="italic text-gray-600">"{{ $ticket->rating->feedback }}"</p>
+                                if (preg_match('/' . preg_quote($techName, '/') . ':\s*(\d)\/5\s*Stars(?:\s*[\(\[]?(?:Note|Ulasan)?:\s*([^\)\|]+)[\)\]]?)?/i', $rawFeedback, $m)) {
+                                    $techRatingValue = (int)$m[1];
+                                    if (!empty($m[2])) {
+                                        $techNote = trim($m[2], " ()[]");
+                                    }
+                                } elseif (preg_match('/' . preg_quote($techName, '/') . '[^\|]*?\((.*?)\)/i', $rawFeedback, $m)) {
+                                    if (!empty($m[1])) {
+                                        $techNote = trim($m[1]);
+                                    }
+                                }
+                            @endphp
+
+                            <div class="bg-gray-50 p-3.5 rounded-xl border border-gray-100 space-y-2.5 flex flex-col justify-between">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-bold text-gray-800 flex items-center gap-1.5 truncate pr-2">
+                                        <i class="fas fa-user-shield text-blue-600 shrink-0"></i> 
+                                        <span class="truncate">{{ $techName }}</span>
+                                    </span>
+                                    <span class="text-amber-400 text-xs font-bold flex items-center gap-1 shrink-0">
+                                        @for($i=1; $i<=5; $i++)
+                                            {!! $i <= $techRatingValue ? '★' : '<span class="text-gray-200">★</span>' !!}
+                                        @endfor
+                                        <span class="text-gray-700 text-xs ml-1 font-semibold">{{ $techRatingValue }}/5</span>
+                                    </span>
                                 </div>
-                            @endif
-                        </div>
+
+                                {{-- Komentar Direct ke Teknisi --}}
+                                <div class="text-xs text-gray-700 bg-white p-2.5 rounded-lg border border-gray-100 space-y-0.5 shadow-xs mt-2">
+                                    <p class="font-semibold text-[10px] text-gray-400 uppercase">Ulasan / Feedback:</p>
+                                    <p class="italic {{ $techNote ? 'text-gray-700 font-medium' : 'text-gray-400' }} leading-relaxed">
+                                        "{{ $techNote ?: 'Tidak ada ulasan tertulis untuk teknisi ini.' }}"
+                                    </p>
+                                </div>
+                            </div>
+                        @endforeach
                     </div>
                 </div>
 
+                {{-- TAMBAHAN CARD OVERALL FEEDBACK DI BAWAH GRID TEKNISI & DI ATAS RESOLUTION TIME --}}
+                @php
+                    $overallComment = null;
+                    if (str_contains($rawFeedback, 'Overall Feedback:')) {
+                        $exp = explode('Overall Feedback:', $rawFeedback);
+                        $overallComment = trim(end($exp));
+                    } elseif (!str_contains($rawFeedback, 'Stars') && !empty($rawFeedback)) {
+                        $overallComment = $rawFeedback;
+                    }
+                @endphp
+
+                @if($overallComment)
+                    <div class="bg-blue-50/70 p-3.5 rounded-xl border border-blue-200 space-y-1 mt-4">
+                        <p class="font-bold text-[10px] text-blue-800 uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fas fa-comment-dots text-blue-600"></i> Additional Overall Feedback:
+                        </p>
+                        <p class="text-xs italic text-gray-700 leading-relaxed pl-4 border-l-2 border-blue-400">
+                            "{{ $overallComment }}"
+                        </p>
+                    </div>
+                @endif
+
                 @if($ticket->rating->resolution_time_minutes)
-                    <div class="text-[11px] text-gray-400 pt-2 border-t border-gray-100 flex items-center gap-1">
+                    <div class="text-[11px] text-gray-400 pt-3 border-t border-gray-100 flex items-center gap-1 mt-4">
                         <i class="far fa-clock"></i> Resolution time: {{ floor($ticket->rating->resolution_time_minutes/60) }}h {{ $ticket->rating->resolution_time_minutes%60 }}m
                     </div>
                 @endif
@@ -391,7 +454,6 @@
 
             <!-- Add Comment -->
             @if(!in_array($ticket->status, ['closed', 'cancelled']))
-            <!-- TAMBAHKAN enctype="multipart/form-data" -->
             <form action="{{ route('tickets.comment', $ticket) }}" method="POST" class="border-t border-gray-100 pt-5" enctype="multipart/form-data">
                 @csrf
                 @can('manageTickets')
@@ -421,14 +483,10 @@
                                     </div>
                                     <p class="text-[10px] text-gray-400 font-medium">Support all file formats (ZIP, RAR, Photo, Video, Document)</p>
                                 </div>
-                                <!-- Hapus atribut accept agar semua ekstensi diizinkan -->
-                               <input type="file" id="comment-file-upload" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.tar,.7z,.mp4,.mov,.avi,.mkv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="previewCommentFiles()">
-                                <p class="text-xs text-gray-600 font-medium">Click or drag files here to attach (ZIP, RAR, Photo, Video, Document)</p>
+                                <input type="file" id="comment-file-upload" name="attachments[]" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="previewCommentFiles()">
                             </div>
-                            <!-- Container Preview File sebelum dikirim -->
                             <div id="comment-file-preview-container" class="mt-3 flex flex-wrap gap-2 hidden"></div>
                         </div>
-                        <!-- AKHIR AREA UPLOAD -->
 
                         <div class="flex items-center justify-between mt-3">
                             @can('manageTickets')
@@ -456,22 +514,18 @@
             <div class="flex items-center gap-3 mb-4">
                 @php
                     $reqUser = $ticket->requester;
-                    // Ambil nama user langsung (yang sudah diupdate jadi Rinus Indra Komara)
                     $detailReqName = $reqUser?->name ?? 'Rinus Indra Komara';
                 @endphp
                 <div class="w-12 h-12 bg-brand-50 rounded-full flex items-center justify-center text-brand-600 font-bold text-sm">
                     {{ strtoupper(substr($detailReqName, 0, 2)) }}
                 </div>
                 <div>
-                    <!-- Menampilkan Nama Asli -->
                     <p class="text-sm font-bold text-gray-900">{{ $detailReqName }}</p>
-                    <!-- Menampilkan Jabatan / Role -->
                     <p class="text-xs text-gray-500">{{ $reqUser?->job_title ?? ($reqUser?->position ?? 'HR Marine Manager') }}</p>
                 </div>
             </div>
             
             <div class="space-y-2 text-sm pt-3 border-t border-gray-100">
-                <!-- Menampilkan Asal Perusahaan / PT (Mengambil dari relasi Company tiket) -->
                 <div class="flex justify-between items-center">
                     <span class="text-gray-500 text-xs">From Company</span>
                     <span class="text-gray-800 font-semibold text-xs text-right">
@@ -499,14 +553,11 @@
             </div>
         </div>
 
-        
-
-        <!-- ASSIGNEE INFO DENGAN MULTIPLE ASSIGNED & TIMELINE TRAIL -->
+        <!-- ASSIGNEE INFO -->
         <div class="bg-white rounded-xl border border-gray-100 p-6 mb-6">
             <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Assignee Info</h3>
             
             @if($ticket->assignedTechnicians && $ticket->assignedTechnicians->count() > 0)
-                <!-- Menampilkan Semua Teknisi yang di-Multiple Assign -->
                 <div class="space-y-3">
                     @foreach($ticket->assignedTechnicians as $tech)
                         <div class="flex items-center gap-3">
@@ -531,7 +582,6 @@
                     </div>
                 </div>
             @else
-                <!-- State Belum Di-assign -->
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-full bg-gray-50 text-gray-400 border border-gray-200 border-dashed flex items-center justify-center">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -545,7 +595,6 @@
                 </div>
             @endif
 
-            <!-- TIMELINE REASSIGN HISTORY -->
             @php
                 $assignmentHistories = $ticket->histories->where('field', 'assigned_to')->sortByDesc('created_at');
             @endphp
@@ -557,7 +606,6 @@
                     <div class="space-y-4 pl-2 border-l-2 border-gray-100 ml-2">
                         @foreach($assignmentHistories as $history)
                             <div class="relative pl-5">
-                                <!-- Titik Timeline -->
                                 <div class="absolute -left-[23px] top-1 w-2.5 h-2.5 rounded-full bg-blue-400 ring-4 ring-white"></div>
                                 
                                 <div class="text-xs text-gray-600 mb-1">
@@ -566,14 +614,12 @@
                                     <span class="font-semibold text-blue-600">{{ $history->new_value }}</span>
                                 </div>
                                 
-                                <!-- Menampilkan Catatan Alasan -->
                                 @if($history->note)
                                     <div class="text-xs text-gray-600 italic bg-blue-50/50 p-2.5 rounded border border-blue-100/50 mt-1.5 mb-1">
                                         <i class="fas fa-quote-left text-blue-300 mr-1"></i> {{ $history->note }}
                                     </div>
                                 @endif
                                 
-                                <!-- Waktu Spesifik -->
                                 <div class="text-[10px] font-medium text-gray-400 flex items-center gap-1 mt-1.5">
                                     <i class="far fa-clock"></i> {{ $history->created_at->format('d M Y, H:i') }}
                                 </div>
@@ -627,7 +673,6 @@
                 </form>
             </div>
         @endif
-        <!-- ======================================= -->
 
         <!-- Assets -->
         @if($ticket->assets->count() > 0)
@@ -721,7 +766,6 @@
         <form action="{{ route('tickets.assign', $ticket) }}" method="POST">
             @csrf
             
-            <!-- Pilihan Teknisi/Admin (Mendukung Multi-Assign untuk Admin) -->
             <div class="mb-3">
                 <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Pilih Teknisi / Admin</label>
                 <p class="text-[11px] text-brand-600 font-medium">💡 Tips: Anda dapat memilih lebih dari 1 teknisi untuk penugasan kolaboratif (independent).</p>
@@ -740,7 +784,6 @@
                 @endif
             </select>
 
-            <!-- Catatan / Alasan -->
             <textarea name="note" rows="2" class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm mb-4" placeholder="{{ Auth::user()->role === 'admin' ? 'Catatan / Alasan Assign (Opsional)...' : 'Alasan eskalasi ke Admin (Wajib diisi jika perlu)...' }}"></textarea>
 
             <div class="flex justify-end gap-2">
@@ -792,7 +835,6 @@
 
 @push('scripts')
 <script>
-// Array untuk menampung file upload balasan
 let selectedCommentFiles = [];
 
 function previewCommentFiles() {
@@ -814,12 +856,10 @@ function updateCommentFileInputAndPreview() {
     const container = document.getElementById('comment-file-preview-container');
     const input = document.getElementById('comment-file-upload');
     
-    // Perbarui data transfer form
     const dataTransfer = new DataTransfer();
     selectedCommentFiles.forEach(file => dataTransfer.items.add(file));
     input.files = dataTransfer.files;
 
-    // Render ulang preview UI
     container.innerHTML = '';
     if (selectedCommentFiles.length > 0) {
         container.classList.remove('hidden');

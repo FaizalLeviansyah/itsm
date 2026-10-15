@@ -3,69 +3,105 @@
 
 @section('content')
 <!-- Page Header -->
-<div class="flex items-center justify-between mb-6">
+<!-- Page Header -->
+<div class="flex items-center justify-between mb-4">
     <div>
-        <h1 class="text-2xl font-bold text-gray-900">All Tickets</h1>
+        <h1 class="text-2xl font-bold text-gray-900">{{ isset($isMyTickets) && $isMyTickets ? 'My Assigned Tickets' : 'All Tickets' }}</h1>
         <p class="text-sm text-gray-500 mt-1">Manage and track all organizational service requests</p>
     </div>
-    <div class="flex items-center gap-2">
-        <a href="{{ route('tickets.index') }}" class="hidden sm:inline-flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
+    <div class="flex items-center gap-2" x-data>
+        <button type="button" @click="$dispatch('toggle-more-filters')" class="hidden sm:inline-flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition cursor-pointer">
             <i class="fas fa-filter text-xs"></i> More Filters
-        </a>
+        </button>
     </div>
 </div>
 
+<!-- TAB NAVIGASI ALL TICKETS & MY TICKETS UNTUK ADMIN/TEKNISI -->
+@if(auth()->user()->role !== 'user')
+<div class="flex items-center gap-2 mb-4 border-b border-gray-200 pb-3">
+    <a href="{{ route('tickets.index') }}" class="px-4 py-2 rounded-lg text-sm font-semibold transition {{ !isset($isMyTickets) ? 'bg-brand-500 text-white shadow-xs' : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200' }}">
+        <i class="fas fa-list mr-1.5"></i> All Tickets
+    </a>
+    <a href="{{ route('tickets.my') }}" class="px-4 py-2 rounded-lg text-sm font-semibold transition {{ isset($isMyTickets) && $isMyTickets ? 'bg-brand-500 text-white shadow-xs' : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200' }}">
+        <i class="fas fa-user-shield mr-1.5"></i> My Tickets
+    </a>
+</div>
+@endif
+
 <!-- Filters -->
-<!-- TAMPILAN FILTER SECARA RESPONSIVE & RAPI (EASY UX) -->
-<div class="bg-white rounded-xl border border-gray-200/80 p-4 mb-6 shadow-xs">
-    <form method="GET" action="{{ route('tickets.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
-        <div>
-            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Status</label>
-            <select name="status" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition">
-                <option value="">All Statuses</option>
-                @foreach(['open','assigned','in_progress','pending','resolved','closed','cancelled'] as $s)
-                    <option value="{{ $s }}" {{ request('status') == $s ? 'selected' : '' }}>{{ ucfirst(str_replace('_',' ',$s)) }}</option>
-                @endforeach
-            </select>
-        </div>
+<div x-data="{ openFilters: {{ request()->hasAny(['vendor_id']) ? 'true' : 'false' }} }" 
+     @toggle-more-filters.window="openFilters = !openFilters"
+     class="bg-white rounded-xl border border-gray-200/80 p-4 mb-6 shadow-xs">
+<!-- Filters -->
+<div x-data="{ openFilters: {{ request()->hasAny(['vendor_id']) ? 'true' : 'false' }} }" 
+     @toggle-more-filters.window="openFilters = !openFilters"
+     class="bg-white rounded-xl border border-gray-200/80 p-4 mb-6 shadow-xs">
+    
+    <form method="GET" action="{{ route('tickets.index') }}" class="space-y-3">
+        <!-- Baris Utama Filter (Status, Priority, Category, Search, Buttons) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Status</label>
+                <select name="status" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition">
+                    <option value="">All Statuses</option>
+                    @foreach(['open','assigned','in_progress','pending','resolved','closed','cancelled'] as $s)
+                        <option value="{{ $s }}" {{ request('status') == $s ? 'selected' : '' }}>{{ ucfirst(str_replace('_',' ',$s)) }}</option>
+                    @endforeach
+                </select>
+            </div>
 
-        <div>
-            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Priority</label>
-            <select name="priority" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition">
-                <option value="">All Priorities</option>
-                @foreach($priorities as $p)
-                    <option value="{{ $p->id }}" {{ request('priority') == $p->id ? 'selected' : '' }}>{{ $p->name }}</option>
-                @endforeach
-            </select>
-        </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Priority</label>
+                <select name="priority" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition">
+                    <option value="">All Priorities</option>
+                    @foreach($priorities as $p)
+                        <option value="{{ $p->id }}" {{ request('priority') == $p->id ? 'selected' : '' }}>{{ $p->name }}</option>
+                    @endforeach
+                </select>
+            </div>
 
-        <div>
-            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Category</label>
-            <select name="category" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition">
-                <option value="">All Categories</option>
-                @foreach($categories as $cat)
-                    <option value="{{ $cat->id }}" {{ request('category') == $cat->id ? 'selected' : '' }}>{{ $cat->name }}</option>
-                @endforeach
-            </select>
-        </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Category</label>
+                <select name="category" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition">
+                    <option value="">All Categories</option>
+                    @foreach($categories as $cat)
+                        <option value="{{ $cat->id }}" {{ request('category') == $cat->id ? 'selected' : '' }}>{{ $cat->name }}</option>
+                    @endforeach
+                </select>
+            </div>
 
-        <div>
-            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Search</label>
-            <div class="relative">
-                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
-                <input type="text" name="search" value="{{ request('search') }}" placeholder="Search ID / Title..." class="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-xs bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition">
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Search</label>
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Search ID / Title..." class="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-xs bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition">
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button type="submit" class="flex-1 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2 px-3 rounded-lg text-xs transition shadow-xs flex items-center justify-center gap-1.5">
+                    <i class="fas fa-filter text-[10px]"></i> Apply Filter
+                </button>
+                @if(request()->hasAny(['status','priority','category','search','vendor_id']))
+                    <a href="{{ route('tickets.index') }}" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Reset Filter">
+                        <i class="fas fa-undo text-xs"></i>
+                    </a>
+                @endif
             </div>
         </div>
 
-        <div class="flex items-center gap-2">
-            <button type="submit" class="flex-1 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2 px-3 rounded-lg text-xs transition shadow-xs flex items-center justify-center gap-1.5">
-                <i class="fas fa-filter text-[10px]"></i> Apply Filter
-            </button>
-            @if(request()->hasAny(['status','priority','category','search']))
-                <a href="{{ route('tickets.index') }}" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Reset Filter">
-                    <i class="fas fa-undo text-xs"></i>
-                </a>
-            @endif
+        <!-- Baris Tambahan Filter Vendor (Akan muncul/slide down saat More Filters diklik) -->
+        <div x-show="openFilters" x-transition class="pt-3 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Third-Party / Vendor</label>
+                <select name="vendor_id" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition">
+                    <option value="">All Vendors / Internal</option>
+                    <option value="none" {{ request('vendor_id') === 'none' ? 'selected' : '' }}>Internal IT Only (No Vendor)</option>
+                    @foreach($vendors ?? [] as $v)
+                        <option value="{{ $v->id }}" {{ request('vendor_id') == $v->id ? 'selected' : '' }}>{{ $v->name }}</option>
+                    @endforeach
+                </select>
+            </div>
         </div>
     </form>
 </div>

@@ -144,4 +144,12 @@ class Ticket extends Model
     {
         return $this->belongsToMany(User::class, 'ticket_technicians', 'ticket_id', 'user_id')->withTimestamps();
     }
+
+    /**
+     * Relasi ke Vendor / Third-Party
+     */
+    public function vendor()
+    {
+        return $this->belongsTo(\App\Models\Vendor::class, 'vendor_id');
+    }
 }

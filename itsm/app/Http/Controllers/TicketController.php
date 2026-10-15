@@ -87,15 +87,16 @@ class TicketController extends Controller
         }
     }
 
-    public function index(Request $request)
+   public function index(Request $request)
     {
         $query = Ticket::with([
             'requester.company',
             'assignee', 
-            'assignedTechnicians', // <-- Pastikan relasi ini ditambahkan di sini
+            'assignedTechnicians', 
             'priority', 
             'category', 
             'company',
+            'vendor',
             'attachments' => function ($q) {
                 $q->whereNull('ticket_comment_id');
             }
@@ -104,15 +105,16 @@ class TicketController extends Controller
         if (Auth::user()->role === 'user') {
             $query->where('requester_id', Auth::id());
         } elseif (Auth::user()->role === 'technician') {
-            if ($request->get('view', 'assigned') === 'assigned') {
-                $query->where(function($q) {
-                    $q->where('assigned_to', Auth::id())
-                      ->orWhereHas('assignedTechnicians', function($t) {
-                          $t->where('user_id', Auth::id());
-                      });
-                });
-            }
+            // Teknisi bisa melihat tiket yang di-assign ke mereka ATAU tiket yang masih unassigned (terbuka untuk diambil)
+            $query->where(function($q) {
+                $q->where('assigned_to', Auth::id())
+                  ->orWhereHas('assignedTechnicians', function($t) {
+                      $t->where('user_id', Auth::id());
+                  })
+                  ->orWhereNull('assigned_to');
+            });
         }
+        // Admin otomatis lolos dan bisa melihat seluruh tiket tanpa batasan
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -126,6 +128,15 @@ class TicketController extends Controller
         if ($request->filled('type')) {
             $query->where('type', $request->type);
         }
+        
+        if ($request->filled('vendor_id')) {
+            if ($request->vendor_id === 'none') {
+                $query->whereNull('vendor_id');
+            } else {
+                $query->where('vendor_id', $request->vendor_id);
+            }
+        }
+
         if ($request->filled('search')) {
             $query->where(function ($q) use ($request) {
                 $q->where('ticket_number', 'like', "%{$request->search}%")
@@ -133,11 +144,12 @@ class TicketController extends Controller
             });
         }
 
-        $tickets = $query->orderByDesc('created_at')->paginate(15);
+        $tickets = $query->orderByDesc('created_at')->paginate(15)->withQueryString();
         $priorities = Priority::all();
         $categories = Category::where('is_active', true)->get();
+        $vendors = \App\Models\Vendor::all(); // Aman tanpa is_active
 
-        return view('tickets.index', compact('tickets', 'priorities', 'categories'));
+        return view('tickets.index', compact('tickets', 'priorities', 'categories', 'vendors'));
     }
 
     public function create()
@@ -393,7 +405,7 @@ class TicketController extends Controller
             'comments.attachments'
         ]);
 
-        $vendors = \App\Models\Vendor::where('is_active', true)->orderBy('name')->get();
+        $vendors = \App\Models\Vendor::all();
         $technicians = User::whereIn('role', ['technician', 'admin'])->where('is_active', true)->get();
 
         $cannedResponses = [];
@@ -547,7 +559,8 @@ class TicketController extends Controller
             ]);
         }
 
-        if ($oldStatus === 'resolved' && in_array($request->status, ['in_progress', 'open', 'assigned'])) {
+        if ($oldStatus === 'resolved' && $request->status !== 'resolved' && $request->status !== 'closed' && Auth::user()->role !== 'admin') {
+            return back()->with('error', 'Tiket yang sudah Resolved hanya dapat diubah kembali melalui tombol Reopen oleh Requester atau diubah langsung oleh Admin.');
             $ticket->load(['requester', 'assignee', 'assignedTechnicians']);
             $requesterPhone = $ticket->requester?->phone;
 
@@ -767,15 +780,14 @@ class TicketController extends Controller
     {
         $this->authorizeTicketAccess($ticket);
 
-        if (!in_array($ticket->status, ['open', 'assigned'])) {
-            return back()->with('error', 'Tickets can only be edited when status is Open or Assigned.');
-        }
-
+        // Jangan batasi hanya open/assigned jika ingin teks/deskripsi bisa diedit, 
+        // tapi pastikan status TIDAK TERUBAH (tetap pada status aslinya seperti resolved/closed).
         $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'required|string',
         ]);
 
+        // Pastikan field status tidak tersentuh sama sekali saat update data umum
         $ticket->update($request->only(['title', 'description', 'category_id', 'priority_id', 'impact', 'location', 'vessel_name']));
 
         TicketHistory::create([
@@ -910,17 +922,18 @@ class TicketController extends Controller
         return back()->with('success', 'Terima kasih! Tiket telah berhasil ditutup dan ulasan Anda telah disimpan.');
     }
 
-    public function myTickets(Request $request)
+   public function myTickets(Request $request)
     {
         $user = Auth::user();
         
         $query = Ticket::with([
             'requester.company', 
             'assignee', 
-            'assignedTechnicians', // <-- Pastikan relasi ini juga ditambahkan di sini
+            'assignedTechnicians', 
             'priority', 
             'category', 
             'company',
+            'vendor',
             'attachments' => function ($q) {
                 $q->whereNull('ticket_comment_id');
             }
@@ -933,8 +946,7 @@ class TicketController extends Controller
                 $q->where('assigned_to', $user->id)
                   ->orWhereHas('assignedTechnicians', function($t) use ($user) {
                       $t->where('user_id', $user->id);
-                  })
-                  ->orWhereNull('assigned_to');
+                  });
             });
         }
 
@@ -947,6 +959,13 @@ class TicketController extends Controller
         if ($request->filled('category')) {
             $query->where('category_id', $request->category);
         }
+        if ($request->filled('vendor_id')) {
+            if ($request->vendor_id === 'none') {
+                $query->whereNull('vendor_id');
+            } else {
+                $query->where('vendor_id', $request->vendor_id);
+            }
+        }
         if ($request->filled('search')) {
             $query->where(function ($q) use ($request) {
                 $q->where('ticket_number', 'like', "%{$request->search}%")
@@ -954,11 +973,12 @@ class TicketController extends Controller
             });
         }
 
-        $tickets = $query->orderByDesc('created_at')->paginate(15);
+        $tickets = $query->orderByDesc('created_at')->paginate(15)->withQueryString();
         $priorities = Priority::all();
         $categories = Category::where('is_active', true)->get();
+        $vendors = \App\Models\Vendor::all();
 
-        return view('tickets.index', compact('tickets', 'priorities', 'categories'))->with('isMyTickets', true);
+        return view('tickets.index', compact('tickets', 'priorities', 'categories', 'vendors'))->with('isMyTickets', true);
     }
 
     public function updatePriority(Request $request, Ticket $ticket)

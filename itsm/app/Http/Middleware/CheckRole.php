@@ -22,8 +22,7 @@ class CheckRole
         }
 
         foreach ($roles as $role) {
-            // Memanfaatkan method hasRole di model User yang sudah menangani pemetaan role API ke admin
-            if ($user->hasRole($role)) {
+            if ($user->role === $role) {
                 return $next($request);
             }
         }

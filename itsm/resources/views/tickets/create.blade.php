@@ -35,14 +35,14 @@
                             </select>
                         </div>
                         
-                        <select name="requester_id" id="on_behalf_select" class="w-full border border-amber-300 rounded-lg px-4 py-2.5 text-sm bg-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500">
-                            <option value="" data-location="all">-- Buat Tiket Untuk Diri Sendiri ({{ auth()->user()->name }}) --</option>
+                       <!-- On Behalf Select (Dengan event Listener onchange) -->
+                        <select name="requester_id" id="on_behalf_select" onchange="updateOnBehalfCompany(this)" class="w-full border border-amber-300 rounded-lg px-4 py-2.5 text-sm bg-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500">
+                            <option value="" data-location="all" data-company="{{ auth()->user()->company->name ?? 'PT Amarin Ship Management' }}">-- Buat Tiket Untuk Diri Sendiri ({{ auth()->user()->name }}) --</option>
                             @foreach(\App\Models\User::where('id', '!=', auth()->id())->where('is_active', true)->orderBy('name')->get() as $u)
                                 @php
                                     $isVessel = str_contains(strtolower($u->name), 'mt ') || str_contains(strtolower($u->email), 'vessel') || str_contains(strtolower($u->position ?? ''), 'vessel');
                                     $locationType = $isVessel ? 'vessel' : 'office';
                                     
-                                    // 1. Dapatkan Nama Lengkap (Fallback jika nama masih berisi NIK/Angka)
                                     $displayName = $u->name;
                                     if (preg_match('/^[P]?\d+$/', $displayName)) {
                                         $displayName = !empty($u->position) && !preg_match('/^[P]?\d+$/', $u->position) 
@@ -50,11 +50,9 @@
                                             : ucwords(str_replace(['.', '_'], ' ', explode('@', $u->email)[0]));
                                     }
 
-                                    // 2. Dapatkan Jabatan, Email, Perusahaan
                                     $jobTitle = $u->job_title ?? ($u->position ?? '');
-                                    $companyName = $u->company->name ?? 'No Company';
+                                    $companyName = $u->company->name ?? 'PT Amarin Ship Management';
                                     
-                                    // 3. Susun Teks Opsi Dropdown: Nama Lengkap - Jabatan (Email) [Perusahaan]
                                     $optionText = $displayName;
                                     if ($jobTitle && strtolower($jobTitle) !== strtolower($displayName)) { 
                                         $optionText .= ' - ' . $jobTitle; 
@@ -64,11 +62,19 @@
                                     }
                                     $optionText .= ' [' . $companyName . ']';
                                 @endphp
-                                <option value="{{ $u->id }}" data-location="{{ $locationType }}" {{ old('requester_id') == $u->id ? 'selected' : '' }}>
+                                <option value="{{ $u->id }}" data-location="{{ $locationType }}" data-company="{{ $companyName }}" {{ old('requester_id') == $u->id ? 'selected' : '' }}>
                                     {{ $optionText }}
                                 </option>
                             @endforeach
                         </select>
+
+                        <!-- Sidebar Additional Info Company (Dinamis dengan ID display_company_text) -->
+                        <div class="mb-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Dari Perusahaan : </label>
+                            <p class="text-sm font-semibold text-brand-600" id="display_company_text">
+                                {{ auth()->user()->company->name ?? 'PT Amarin Ship Management' }}
+                            </p>
+                        </div>
                         
                         <p class="text-[11px] text-amber-800 font-medium mt-2">
                             💡 *Tip: Ketik nama, email, atau jabatan untuk mencari cepat. Tiket atas nama user lain akan memerlukan <strong>Approval</strong>.*
@@ -185,11 +191,11 @@
             <div class="bg-white rounded-xl border border-gray-100 p-5">
                 <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Additional Info</h4>
                 
-                <!-- BAGIAN YANG DITAMBAHKAN: READ ONLY COMPANY -->
+                <!-- Sidebar Additional Info Company (Dinamis dengan ID display_company_text) -->
                 <div class="mb-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
                     <label class="block text-xs font-medium text-gray-600 mb-1">Dari Perusahaan : </label>
-                    <p class="text-sm font-semibold text-gray-900">
-                        {{ auth()->user()->company->name ?? 'Perusahaan Tidak Terdeteksi' }}
+                    <p class="text-sm font-semibold text-brand-600" id="display_company_text">
+                        {{ auth()->user()->company->name ?? 'PT Amarin Ship Management' }}
                     </p>
                 </div>
                 <!-- AKHIR BAGIAN YANG DITAMBAHKAN -->
@@ -281,6 +287,16 @@ function previewFiles() {
     });
 
     updateFileInputAndPreview();
+}
+
+function updateOnBehalfCompany(selectEl) {
+    const selectedOption = selectEl.options[selectEl.selectedIndex];
+    const companyName = selectedOption.getAttribute('data-company') || "{{ auth()->user()->company->name ?? 'PT Amarin Ship Management' }}";
+    
+    const displayEl = document.getElementById('display_company_text');
+    if (displayEl) {
+        displayEl.innerText = companyName;
+    }
 }
 
 function filterUserLocation(location) {

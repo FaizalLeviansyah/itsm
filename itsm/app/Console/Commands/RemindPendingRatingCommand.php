@@ -25,9 +25,11 @@ class RemindPendingRatingCommand extends Command
             if ($ticket->requester && !empty($ticket->requester->phone)) {
                 try {
                     $publicLink = route('ticket.public.review', $ticket->public_token);
+                    // Use name accessor which already falls back to full_name
+                    $requesterName = $ticket->requester->name ?? 'Valued Customer';
 
                     $waMessage  = "🔔 *[DAILY REMINDER - IT SERVICE RATING]*\n\n";
-                    $waMessage .= "Dear *{$ticket->requester->full_name}*,\n\n";
+                    $waMessage .= "Dear *{$requesterName}*,\n\n";
                     $waMessage .= "This is a friendly reminder that ticket *{$ticket->title}* (#{$ticket->ticket_number}) has been resolved.\n\n";
                     $waMessage .= "Please take 5 seconds to rate our technical support so this ticket can be officially closed (no login required):\n\n";
                     $waMessage .= "👉 {$publicLink}\n\n";

@@ -43,10 +43,10 @@ class User extends Authenticatable
         return $this->hasMany(Ticket::class, 'requester_id');
     }
 
-    public function company()
-{
-    return $this->belongsTo(Company::class, 'company_id');
-}
+    public function company(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Company::class, 'company_id');
+    }
 
     public function ticketsAssigned()
     {
@@ -68,38 +68,48 @@ class User extends Authenticatable
         return $this->ratings()->avg('rating') ?? 0;
     }
 
-    public function getCompanyAttribute()
+    /**
+     * Resolve company name string for display when the relation is not loaded.
+     * Named getCompanyNameAttribute to avoid conflicting with the company() relation.
+     */
+    public function getCompanyNameAttribute(): string
     {
+        // Use loaded relation first
         if ($this->relationLoaded('company') && $this->getRelation('company')) {
-            return $this->getRelation('company');
+            return $this->getRelation('company')->name;
         }
-        
+
         if ($this->company_id) {
             $company = \App\Models\Company::find($this->company_id);
-            if ($company) return $company;
+            if ($company) return $company->name;
         }
 
         $email = strtolower($this->email ?? '');
         $department = strtolower($this->department ?? '');
 
-        // Deteksi Caraka Tirta Pratama
         if (str_contains($email, 'caraka') || str_contains($department, 'caraka')) {
-            return \App\Models\Company::find(2) ?? (object)['name' => 'PT Caraka Tirta Pratama'];
+            return \App\Models\Company::find(2)?->name ?? 'PT Caraka Tirta Pratama';
         }
 
-        // Deteksi Amarin Ship Management (Hanya email resmi perusahaan)
         if (str_contains($email, '@amarinshipmgmt.com') || str_contains($email, '@amarinshipmanagement.com') || str_contains($email, 'itoperation') || str_contains($email, 'head.it')) {
-            return \App\Models\Company::find(1) ?? (object)['name' => 'PT Amarin Ship Management'];
+            return \App\Models\Company::find(1)?->name ?? 'PT Amarin Ship Management';
         }
 
-        // Selebihnya (termasuk semua yang pakai @gmail.com) masuk ke PT Amarin Crewing Services
-        return \App\Models\Company::find(3) ?? (object)['name' => 'PT Amarin Crewing Services'];
+        return \App\Models\Company::find(3)?->name ?? 'PT Amarin Crewing Services';
     }
 
-    public function getNameAttribute($value)
+    /**
+     * Check if user has a given role.
+     */
+    public function hasRole(string $role): bool
     {
-        return !empty($this->attributes['full_name']) 
-            ? $this->attributes['full_name'] 
+        return $this->role === $role;
+    }
+
+    public function getNameAttribute($value): string
+    {
+        return !empty($this->attributes['full_name'])
+            ? $this->attributes['full_name']
             : ($value ?? 'User');
     }
 }

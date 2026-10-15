@@ -114,6 +114,23 @@ class WhatsAppService
         return $this->sendMessage($to, $message);
     }
 
+    /**
+     * Notifikasi saat tiket breach SLA
+     */
+    public function notifySlaBreach(Ticket $ticket)
+    {
+        $to = $ticket->assignee->phone ?? $this->defaultTo;
+
+        $message  = "⚠️ *[SLA BREACH ALERT]*\n\n";
+        $message .= "Ticket Number: *{$ticket->ticket_number}*\n";
+        $message .= "Title: {$ticket->title}\n";
+        $message .= "Priority: " . ($ticket->priority->name ?? '-') . "\n";
+        $message .= "Due Date: " . ($ticket->due_date?->format('d M Y H:i') ?? '-') . "\n\n";
+        $message .= "Tiket ini telah melewati batas SLA. Harap segera ditangani!";
+
+        return $this->sendMessage($to, $message);
+    }
+
     public function notifyAdminActivity(Ticket $ticket, string $actionName, string $actionBy)
     {
         // Selalu kirim ke nomor Admin (defaultTo)

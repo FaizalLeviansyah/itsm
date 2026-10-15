@@ -20,7 +20,6 @@ class AutoCloseResolvedTickets extends Command
             ->update([
                 'status' => 'closed',
                 'closed_at' => Carbon::now(),
-                'close_reason' => 'Otomatis ditutup oleh sistem karena tidak ada respon dari requester selama 3 hari.'
             ]);
 
         $this->info("Berhasil menutup {$affected} tiket berstatus resolved.");

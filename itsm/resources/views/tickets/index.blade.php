@@ -16,52 +16,56 @@
 </div>
 
 <!-- Filters -->
-<div class="bg-white rounded-xl border border-gray-100 p-4 mb-6">
-    <form method="GET" class="flex flex-wrap items-center gap-3">
-        <div class="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase">
-            <span>Status</span>
+<!-- TAMPILAN FILTER SECARA RESPONSIVE & RAPI (EASY UX) -->
+<div class="bg-white rounded-xl border border-gray-200/80 p-4 mb-6 shadow-xs">
+    <form method="GET" action="{{ route('tickets.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+        <div>
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Status</label>
+            <select name="status" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition">
+                <option value="">All Statuses</option>
+                @foreach(['open','assigned','in_progress','pending','resolved','closed','cancelled'] as $s)
+                    <option value="{{ $s }}" {{ request('status') == $s ? 'selected' : '' }}>{{ ucfirst(str_replace('_',' ',$s)) }}</option>
+                @endforeach
+            </select>
         </div>
-        <select name="status" class="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500">
-            <option value="">All Statuses</option>
-            @foreach(['open','assigned','in_progress','pending','resolved','closed','cancelled'] as $s)
-            <option value="{{ $s }}" {{ request('status') == $s ? 'selected' : '' }}>{{ ucfirst(str_replace('_',' ',$s)) }}</option>
-            @endforeach
-        </select>
 
-        <div class="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase">
-            <span>Priority</span>
+        <div>
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Priority</label>
+            <select name="priority" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition">
+                <option value="">All Priorities</option>
+                @foreach($priorities as $p)
+                    <option value="{{ $p->id }}" {{ request('priority') == $p->id ? 'selected' : '' }}>{{ $p->name }}</option>
+                @endforeach
+            </select>
         </div>
-        <select name="priority" class="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500">
-            <option value="">All Priorities</option>
-            @foreach($priorities as $p)
-            <option value="{{ $p->id }}" {{ request('priority') == $p->id ? 'selected' : '' }}>{{ $p->name }}</option>
-            @endforeach
-        </select>
 
-        <div class="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase">
-            <span>Category</span>
+        <div>
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Category</label>
+            <select name="category" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition">
+                <option value="">All Categories</option>
+                @foreach($categories as $cat)
+                    <option value="{{ $cat->id }}" {{ request('category') == $cat->id ? 'selected' : '' }}>{{ $cat->name }}</option>
+                @endforeach
+            </select>
         </div>
-        <select name="category" class="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500">
-            <option value="">All Categories</option>
-            @foreach($categories as $cat)
-            <option value="{{ $cat->id }}" {{ request('category') == $cat->id ? 'selected' : '' }}>{{ $cat->name }}</option>
-            @endforeach
-        </select>
 
-        <div class="flex-1 min-w-[180px]">
+        <div>
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Search</label>
             <div class="relative">
                 <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
-                <input type="text" name="search" value="{{ request('search') }}" placeholder="Search tickets..." class="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500">
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="Search ID / Title..." class="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-xs bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition">
             </div>
         </div>
 
-        <button type="submit" class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">Filter</button>
-        @if(request()->hasAny(['status','priority','category','search','type']))
-        <a href="{{ route('tickets.index') }}" class="text-sm text-gray-500 hover:text-gray-700">Reset</a>
-        @endif
-
-        <div class="ml-auto text-xs text-gray-400">
-            Showing {{ $tickets->count() }} of {{ $tickets->total() }} tickets
+        <div class="flex items-center gap-2">
+            <button type="submit" class="flex-1 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2 px-3 rounded-lg text-xs transition shadow-xs flex items-center justify-center gap-1.5">
+                <i class="fas fa-filter text-[10px]"></i> Apply Filter
+            </button>
+            @if(request()->hasAny(['status','priority','category','search']))
+                <a href="{{ route('tickets.index') }}" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Reset Filter">
+                    <i class="fas fa-undo text-xs"></i>
+                </a>
+            @endif
         </div>
     </form>
 </div>

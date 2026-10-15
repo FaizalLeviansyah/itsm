@@ -209,6 +209,8 @@ class LoginController extends Controller
 
                 if ($passwordValid) {
                     $defaultCompany = Company::first();
+                    // $user may not be defined in this fallback branch — use safe defaults
+                    $existingUser = User::where('email', $email)->first();
                     $localUser = User::updateOrCreate(
                         ['email' => $email],
                         [
@@ -218,8 +220,8 @@ class LoginController extends Controller
                             'position' => 'Vessel - ' . ($vessel->name ?? ''),
                             'source' => 'vessel',
                             'source_id' => $vessel->id ?? null,
-                            'company_id' => $user ? ($user->company_id ?? $defaultCompany?->id) : $defaultCompany?->id,
-                            'role' => $user ? ($user->role ?? 'user') : 'user',
+                            'company_id' => $existingUser?->company_id ?? $defaultCompany?->id,
+                            'role' => $existingUser?->role ?? 'user',
                         ]
                     );
 

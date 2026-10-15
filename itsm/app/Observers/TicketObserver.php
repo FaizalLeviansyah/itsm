@@ -24,10 +24,15 @@ class TicketObserver
      */
     public function creating(Ticket $ticket): void
     {
-        $sla = SlaPolicy::where('priority', $ticket->priority)->first();
-
-        if ($sla) {
-            $ticket->due_date = Carbon::now()->addMinutes($sla->resolution_time_minutes);
+        // Resolve the priority name from the priority_id relationship
+        if ($ticket->priority_id) {
+            $priority = \App\Models\Priority::find($ticket->priority_id);
+            if ($priority) {
+                $sla = SlaPolicy::where('priority', $priority->name)->first();
+                if ($sla) {
+                    $ticket->due_date = Carbon::now()->addMinutes($sla->resolution_time_minutes);
+                }
+            }
         }
     }
 

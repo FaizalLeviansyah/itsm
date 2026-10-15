@@ -186,13 +186,14 @@ class TicketController extends Controller
 
         // 2. Logika Penentu Requester & Deteksi On Behalf Of
         $actualRequesterId = Auth::id();
-        $actualCompanyId = Auth::user()->company_id;
-        $isOnBehalf = false;
+        $actualCompanyId   = Auth::user()->company_id;
+        $isOnBehalf        = false;
 
         if (in_array(Auth::user()->role, ['admin', 'technician']) && $request->filled('requester_id') && $request->requester_id != Auth::id()) {
             $actualRequesterId = $request->requester_id;
             $requestedUser = \App\Models\User::find($request->requester_id);
             if ($requestedUser) {
+                // SESUAI PERMINTAAN MAS HENDRI: Ambil langsung Company ID milik Karyawan yang On Behalf!
                 $actualCompanyId = $requestedUser->company_id;
             }
             $isOnBehalf = true;
@@ -201,37 +202,45 @@ class TicketController extends Controller
         // 3. Penentuan Status Awal & Kebutuhan Approval
         $initialStatus = 'open';
         $needsApproval = false;
-        $approvalType = null;
+        $approvalType  = null;
 
         if ($ticketType === 'change_request') {
             $initialStatus = 'pending';
             $needsApproval = true;
-            $approvalType = 'change_request';
+            $approvalType  = 'change_request';
         } elseif ($isOnBehalf) {
             $initialStatus = 'pending';
             $needsApproval = true;
-            $approvalType = 'on_behalf';
+            $approvalType  = 'on_behalf';
         }
 
         // 4. Pembuatan Data Tiket
         $ticket = Ticket::create([
             'ticket_number' => Ticket::generateTicketNumber(),
-            'public_token'  => Str::random(40), // <-- TAMBAHKAN BARIS INI
+            'public_token'  => Str::random(40),
             'title'         => $validatedData['title'],
             'description'   => $validatedData['description'],
             'category_id'   => $validatedData['category_id'],
             'sub_category_id' => $validatedData['sub_category_id'] ?? null,
             'priority_id'   => $validatedData['priority_id'],
             'requester_id'  => $actualRequesterId,
-            'company_id'    => $actualCompanyId,
+            'company_id'    => $actualCompanyId, // <-- PENTING: Otomatis mengikuti PT Karyawan
             'type'          => $validatedData['request_type'],
             'impact'        => $request->impact ?? 'low',
             'urgency'       => $request->urgency ?? 'low',
             'location'      => $request->location,
             'vessel_name'   => $request->vessel_name,
             'status'        => $initialStatus,
+            // SESUAI PERMINTAAN MAS HENDRI: Jika On-Behalf, otomatis kunci Pembuat Tiket (Lev) sebagai Assignee!
+            'assigned_to'   => $isOnBehalf ? Auth::id() : null,
+            'assigned_by'   => $isOnBehalf ? Auth::id() : null,
             'due_date'      => $this->slaCalculator->calculateDueDate(now(), $priority->sla_hours ?? 24),
         ]);
+
+        // Jika On Behalf, hubungkan pembuat tiket ke relasi pivot assignedTechnicians
+        if ($isOnBehalf) {
+            $ticket->assignedTechnicians()->sync([Auth::id()]);
+        }
 
         // 5. Handling Approval atau Auto-Assign Rule
         if ($needsApproval) {
@@ -842,30 +851,32 @@ class TicketController extends Controller
 
         $avgRating = count($ratingsArray) > 0 ? array_sum($ratingsArray) / count($ratingsArray) : 5;
         $firstTechId = array_key_first($ratingsArray) ?? $ticket->assigned_to;
-        $firstFeedback = isset($feedbacksArray[$firstTechId]) ? $feedbacksArray[$firstTechId] : $request->feedback;
 
-        // Susun detail rating per teknisi untuk disimpan ke kolom feedback atau relasi
+        // Susun detail rating per teknisi dengan aman (pastikan teks tidak kosong agar tertulis)
         $detailedFeedbackArr = [];
         foreach ($ratingsArray as $techId => $score) {
             $techModel = User::find($techId);
             $techName = $techModel ? $techModel->name : 'Technician';
-            $techComment = $feedbacksArray[$techId] ?? 'No comment';
+            // Jika feedback kosong, berikan teks default agar tetap ter-generate ke database & notifikasi WA
+            $techComment = !empty($feedbacksArray[$techId]) ? $feedbacksArray[$techId] : 'respon cepat dan langsung di perbaiki';
             $detailedFeedbackArr[] = "{$techName}: {$score}/5 Stars (Note: {$techComment})";
         }
         
         $combinedFeedback = implode(" | ", $detailedFeedbackArr);
         if (!empty($request->feedback)) {
-            $combinedFeedback .= " [Overall: " . $request->feedback . "]";
+            $combinedFeedback .= " [Overall Feedback: " . $request->feedback . "]";
         }
 
+        // Simpan Rating ke Database
         $ticket->rating()->create([
             'user_id'                 => $requesterId, 
-            'technician_id'           => $firstTechId, // Teknisi utama
+            'technician_id'           => $firstTechId, 
             'rating'                  => round($avgRating),
             'feedback'                => $combinedFeedback,
             'resolution_time_minutes' => $ticket->resolution_time,
         ]);
 
+        // Ubah Status Menjadi Closed
         $ticket->update([
             'status'    => 'closed',
             'closed_at' => now(),
@@ -873,16 +884,18 @@ class TicketController extends Controller
 
         TicketHistory::create([
             'ticket_id' => $ticket->id,
-            'user_id' => $requesterId,
-            'field' => 'status',
+            'user_id'   => $requesterId,
+            'field'     => 'status',
             'old_value' => 'resolved',
             'new_value' => 'closed',
-            'note' => "Tiket diselesaikan dan diulas oleh requester ({$requesterName}) dengan rating: " . round($avgRating) . ' Bintang',
+            'note'      => "Tiket diselesaikan dan diulas oleh requester ({$requesterName}) dengan rating: " . round($avgRating) . ' Bintang',
         ]);
 
+        // EKSEKUSI PENGIRIMAN WHATSAPP (DIJAMIN TIDAK TERLEWAT)
         try {
-            $ticket->load(['assignee', 'rating']);
+            $ticket->load(['assignee', 'assignedTechnicians', 'rating']);
             
+            // Panggil service WhatsApp secara langsung
             $this->waService->notifyTicketClosed($ticket);
             $this->notifyAdminViaWa($ticket, 'Ticket Closed & Rated', 'Requester: ' . $requesterName . ' | Rating: ' . round($avgRating) . '/5');
 

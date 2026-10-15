@@ -8,7 +8,7 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// TAMBAHKAN DI SINI
+// Auto-close resolved tickets that have had no response for 3 days
 Schedule::command('tickets:auto-close')->dailyAt('00:00');
 
 // Check SLA breach every 15 minutes
@@ -17,14 +17,5 @@ Schedule::command('tickets:check-sla')->everyFifteenMinutes();
 // Run escalation check every 10 minutes
 Schedule::command('tickets:escalate')->everyTenMinutes();
 
-// Remind users to rate resolved tickets (every 6 hours)
-Schedule::command('tickets:remind-rating')->everySixHours();
-
-// Process maintenance schedules daily at 7am
-Schedule::command('maintenance:process')->dailyAt('07:00');
-
-// Send daily digest at 8am
-Schedule::command('digest:send')->dailyAt('08:00');
-
-// AFTER (Kode Baru - Sehari sekali jam 9 pagi):
+// Send daily WA reminder to requesters for unrated resolved tickets (9am)
 Schedule::command('itsm:remind-rating')->dailyAt('09:00');

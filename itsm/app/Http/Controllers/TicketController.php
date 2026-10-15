@@ -39,7 +39,24 @@ class TicketController extends Controller
     private function notifyAdminViaWa(Ticket $ticket, string $actionName, string $extraNote = '')
     {
         try {
-            $adminPhone = env('WA_DEFAULT_TO', '628563339320'); // Nomor admin
+            // 1. Ambil nomor dari .env (Nomor Anda / Default)
+            $defaultAdminPhone = env('WA_DEFAULT_TO', '6287851932416');
+            
+            // 2. Cari nomor WhatsApp Pak Hendri Setio Prakoso dari database
+            // (Mencakup variasi ejaan Hendry atau Hendri)
+            $hendriUser = User::where(function($q) {
+                $q->where('name', 'like', '%Hendri%')
+                  ->orWhere('name', 'like', '%Hendry%');
+            })->whereNotNull('phone')->first();
+
+            // Kumpulkan nomor tujuan ke dalam array unik agar tidak terkirim dua kali jika nomornya sama
+            $recipients = [$defaultAdminPhone];
+
+            if ($hendriUser && !empty($hendriUser->phone)) {
+                $recipients[] = $hendriUser->phone;
+            }
+
+            // Format Pesan WhatsApp
             $message  = "*[ADMIN ALERT - TICKET UPDATE]*\n\n";
             $message .= "Ticket: *{$ticket->ticket_number}*\n";
             $message .= "Title: {$ticket->title}\n";
@@ -48,7 +65,14 @@ class TicketController extends Controller
             if ($extraNote) {
                 $message .= "Note: {$extraNote}\n";
             }
-            $this->waService->sendMessage($adminPhone, $message);
+
+            // Kirim pesan ke setiap penerima dalam daftar
+            foreach (array_unique($recipients) as $phone) {
+                if (!empty($phone)) {
+                    $this->waService->sendMessage($phone, $message);
+                }
+            }
+
         } catch (\Exception $e) {
             Log::error('WA Admin Alert Failed: ' . $e->getMessage());
         }
@@ -87,7 +111,7 @@ class TicketController extends Controller
         }
     }
 
-   public function index(Request $request)
+  public function index(Request $request)
     {
         $query = Ticket::with([
             'requester.company',
@@ -105,7 +129,6 @@ class TicketController extends Controller
         if (Auth::user()->role === 'user') {
             $query->where('requester_id', Auth::id());
         } elseif (Auth::user()->role === 'technician') {
-            // Teknisi bisa melihat tiket yang di-assign ke mereka ATAU tiket yang masih unassigned (terbuka untuk diambil)
             $query->where(function($q) {
                 $q->where('assigned_to', Auth::id())
                   ->orWhereHas('assignedTechnicians', function($t) {
@@ -114,21 +137,25 @@ class TicketController extends Controller
                   ->orWhereNull('assigned_to');
             });
         }
-        // Admin otomatis lolos dan bisa melihat seluruh tiket tanpa batasan
 
+        // Filter berdasarkan Status
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
+        // Filter berdasarkan Priority
         if ($request->filled('priority')) {
             $query->where('priority_id', $request->priority);
         }
+        // Filter berdasarkan Category
         if ($request->filled('category')) {
             $query->where('category_id', $request->category);
         }
+        // Filter berdasarkan Type
         if ($request->filled('type')) {
             $query->where('type', $request->type);
         }
         
+        // Filter berdasarkan Vendor / Third-Party
         if ($request->filled('vendor_id')) {
             if ($request->vendor_id === 'none') {
                 $query->whereNull('vendor_id');
@@ -137,6 +164,22 @@ class TicketController extends Controller
             }
         }
 
+        // FILTER BARU: Berdasarkan Petugas IT / Teknisi (Assignee / AssignedTechnicians)
+        if ($request->filled('technician_id')) {
+            $techId = $request->technician_id;
+            if ($techId === 'unassigned') {
+                $query->whereNull('assigned_to')->whereDoesntHave('assignedTechnicians');
+            } else {
+                $query->where(function($q) use ($techId) {
+                    $q->where('assigned_to', $techId)
+                      ->orWhereHas('assignedTechnicians', function($t) use ($techId) {
+                          $t->where('user_id', $techId);
+                      });
+                });
+            }
+        }
+
+        // Filter berdasarkan Search (ID / Title)
         if ($request->filled('search')) {
             $query->where(function ($q) use ($request) {
                 $q->where('ticket_number', 'like', "%{$request->search}%")
@@ -147,9 +190,11 @@ class TicketController extends Controller
         $tickets = $query->orderByDesc('created_at')->paginate(15)->withQueryString();
         $priorities = Priority::all();
         $categories = Category::where('is_active', true)->get();
-        $vendors = \App\Models\Vendor::all(); // Aman tanpa is_active
+        $vendors = \App\Models\Vendor::all();
+        // Ambil daftar teknisi & admin yang aktif untuk dropdown filter
+        $technicians = User::whereIn('role', ['technician', 'admin'])->where('is_active', true)->orderBy('name')->get();
 
-        return view('tickets.index', compact('tickets', 'priorities', 'categories', 'vendors'));
+        return view('tickets.index', compact('tickets', 'priorities', 'categories', 'vendors', 'technicians'));
     }
 
     public function create()
@@ -458,11 +503,11 @@ class TicketController extends Controller
 
             TicketHistory::create([
                 'ticket_id' => $ticket->id,
-                'user_id' => Auth::id(),
-                'field' => 'assigned_to',
+                'user_id'   => Auth::id(), // Pastikan murni mencatat ID user yang sedang login saat itu
+                'field'     => 'assigned_to',
                 'old_value' => $oldAssignee ? User::find($oldAssignee)?->name : null,
-                'new_value' => $technicianNames,
-                'note' => $historyNote,
+                'new_value' => Auth::user()->name, // Catat nama pelaku aktif
+                'note'      => $request->note ?: 'Ticket assigned by ' . Auth::user()->name,
             ]);
         } else {
             $singleTargetId = $assignedIds[0];

@@ -278,28 +278,22 @@ class TicketController extends Controller
             'public_token'  => Str::random(40),
             'title'         => $validatedData['title'],
             'description'   => $validatedData['description'],
-            'vendor_id'     => $request->vendor_id ?? null, // Simpan Vendor ID
+            'vendor_id'     => $request->vendor_id ?? null,
             'category_id'   => $validatedData['category_id'],
             'sub_category_id' => $validatedData['sub_category_id'] ?? null,
             'priority_id'   => $validatedData['priority_id'],
             'requester_id'  => $actualRequesterId,
-            'company_id'    => $actualCompanyId, // <-- PENTING: Otomatis mengikuti PT Karyawan
+            'company_id'    => $actualCompanyId,
             'type'          => $validatedData['request_type'],
             'impact'        => $request->impact ?? 'low',
             'urgency'       => $request->urgency ?? 'low',
             'location'      => $request->location,
             'vessel_name'   => $request->vessel_name,
             'status'        => $initialStatus,
-            // SESUAI PERMINTAAN MAS HENDRI: Jika On-Behalf, otomatis kunci Pembuat Tiket (Lev) sebagai Assignee!
-            'assigned_to'   => $isOnBehalf ? Auth::id() : null,
-            'assigned_by'   => $isOnBehalf ? Auth::id() : null,
+            'assigned_to'   => null, // Murni Unassigned agar tidak melangkahi Approval Head IT
+            'assigned_by'   => null,
             'due_date'      => $this->slaCalculator->calculateDueDate(now(), $priority->sla_hours ?? 24),
         ]);
-
-        // Jika On Behalf, hubungkan pembuat tiket ke relasi pivot assignedTechnicians
-        if ($isOnBehalf) {
-            $ticket->assignedTechnicians()->sync([Auth::id()]);
-        }
 
         // 5. Handling Approval atau Auto-Assign Rule
         if ($needsApproval) {
@@ -595,7 +589,7 @@ class TicketController extends Controller
         $oldStatus = $ticket->status;
         $data = ['status' => $request->status];
 
-        if ($oldStatus === 'pending' && $ticket->approvals()->where('status', 'pending')->exists()) {
+       if ($oldStatus === 'pending' && $ticket->approvals()->where('status', 'pending')->exists()) {
             $approvalStatus = $request->status === 'cancelled' ? 'rejected' : 'approved';
             
             $ticket->approvals()->where('status', 'pending')->update([
@@ -604,6 +598,47 @@ class TicketController extends Controller
                 'approved_at' => now(),
                 'notes' => $request->resolution_notes,
             ]);
+
+            // Jika disetujui (Approved)
+            if ($approvalStatus === 'approved') {
+                // CEK: Apakah teknisi sudah terlanjur beraksi/bekerja?
+                $hasTechnicianActed = ($ticket->status !== 'pending' && $ticket->status !== 'open') || !empty($ticket->assigned_to) || $ticket->assignedTechnicians()->exists();
+
+                if ($hasTechnicianActed) {
+                    // JANGAN UBAH STATUS! Biarkan status aktif yang dikerjakan teknisi tetap berjalan.
+                    $data['status'] = $ticket->status;
+                } else {
+                    // Jika belum beraksi sama sekali, jalankan auto-assign / set ke assigned seperti biasa
+                    $autoAssignee = \App\Models\AutoAssignRule::findAssignee(
+                        $ticket->category_id,
+                        $ticket->sub_category_id,
+                        $ticket->company_id,
+                        $ticket->vessel_name,
+                        Auth::user()->source
+                    );
+                    
+                    if ($autoAssignee) {
+                        $data['assigned_to'] = $autoAssignee;
+                        $data['assigned_at'] = now();
+                        $data['status']      = 'assigned';
+
+                        if (method_exists($ticket, 'assignedTechnicians')) {
+                            $ticket->assignedTechnicians()->sync([$autoAssignee]);
+                        }
+                    } else {
+                        $data['status'] = 'assigned';
+                    }
+
+                    TicketHistory::create([
+                        'ticket_id' => $ticket->id,
+                        'user_id'   => Auth::id(),
+                        'field'     => 'status',
+                        'old_value' => 'pending',
+                        'new_value' => 'assigned',
+                        'note'      => 'Ticket approved by Admin/Head IT and set to assigned',
+                    ]);
+                }
+            }
         }
 
         if ($oldStatus === 'resolved' && $request->status !== 'resolved' && $request->status !== 'closed' && Auth::user()->role !== 'admin') {
@@ -671,6 +706,10 @@ class TicketController extends Controller
                     Log::error('Gagal mengirim WA Public Review ke Requester: ' . $e->getMessage());
                 }
             }
+        }
+        // TAMBAHAN FOKUS: Jika status dicancel, hentikan SLA / kosongkan due_date
+        if ($request->status === 'cancelled') {
+            $data['due_date'] = null;
         } elseif ($request->status === 'closed') {
             $data['closed_at'] = now();
         } elseif ($request->status === 'in_progress' && !$ticket->first_response_at) {

@@ -37,11 +37,15 @@ class TicketNotification extends Notification implements ShouldQueue
         $isRequester = ($notifiable->id === $this->ticket->requester_id);
         $isAdmin = ($notifiable->role === 'admin');
         
-        // Menggunakan icon publik yang valid di folder public
-        $logoUrl = asset('icon-512.png');
+        // 1. Dapatkan URL Logo Publik yang Valid (Gunakan URL Domain Aplikasi)
+        $logoUrl = config('app.url') . '/storage/companies/OZhBiZbGGW5cbErTTOVLpXHflaJcfZsM8ycrj1Ev.jpg';
+
+        // 2. Susun Konteks Masalah Singkat untuk Preview Text di Inbox
+        $issueContext = "Issue: " . $this->ticket->title . " (" . ($this->ticket->vessel_name ?: ($this->ticket->location ?: 'Office')) . ")";
 
         $mail = (new MailMessage)
             ->subject($this->getSubject($isRequester))
+            ->line($issueContext) // Dipasang paling atas agar terbaca di Mail Peek/Preview Text!
             ->line("![Amarin Logo]({$logoUrl})");
 
         switch ($this->type) {
@@ -58,7 +62,7 @@ class TicketNotification extends Notification implements ShouldQueue
                          ->line("A new ticket **{$this->ticket->ticket_number}** has been created by **" . ($this->ticket->requester->name ?? 'User') . "**.");
                 }
 
-                $mail->line("**Title:** {$this->ticket->title}")
+                $mail->line("**Subject / Title:** {$this->ticket->title}")
                      ->line("**Category:** " . ($this->ticket->category->name ?? '-'))
                      ->line("**Priority:** " . ($this->ticket->priority->name ?? '-'))
                      ->line("**Location/Vessel:** " . ($this->ticket->vessel_name ?: ($this->ticket->location ?: 'Office')))
@@ -216,21 +220,25 @@ class TicketNotification extends Notification implements ShouldQueue
         ];
     }
 
+    /**
+     * Memformat Subject Email tanpa awalan [Amarin ITSM] dan menyertakan Subject/Masalah Tiket
+     */
     private function getSubject(bool $isRequester): string
     {
-        $prefix = "[Amarin ITSM]";
-        
+        $ticketNum = $this->ticket->ticket_number;
+        $title = \Illuminate\Support\Str::limit($this->ticket->title, 35);
+
         return match ($this->type) {
-            'created' => "{$prefix} " . ($isRequester ? "Ticket Submitted: {$this->ticket->ticket_number}" : "New Ticket Alert: {$this->ticket->ticket_number}"),
-            'open', 'waiting_for_assign' => "{$prefix} Ticket Open: {$this->ticket->ticket_number}",
-            'in_progress' => "{$prefix} Ticket In Progress: {$this->ticket->ticket_number}",
-            'assigned' => "{$prefix} Ticket Assigned: {$this->ticket->ticket_number}",
-            'resolved' => "{$prefix} Ticket Resolved: {$this->ticket->ticket_number}",
-            'escalated' => "{$prefix} ⚠️ Escalation: {$this->ticket->ticket_number}",
-            'approval_required' => "{$prefix} Approval Required: {$this->ticket->ticket_number}",
-            'approval_decided' => "{$prefix} Approval Update: {$this->ticket->ticket_number}",
-            'reopened' => "{$prefix} Ticket Reopened: {$this->ticket->ticket_number}",
-            default => "{$prefix} Update: {$this->ticket->ticket_number}",
+            'created' => ($isRequester ? "Ticket Submitted: {$ticketNum} - {$title}" : "New Ticket Alert: {$ticketNum} - {$title}"),
+            'open', 'waiting_for_assign' => "Ticket Open: {$ticketNum} - {$title}",
+            'in_progress' => "Ticket In Progress: {$ticketNum} - {$title}",
+            'assigned' => "Ticket Assigned: {$ticketNum} - {$title}",
+            'resolved' => "Ticket Resolved: {$ticketNum} - {$title}",
+            'escalated' => "⚠️ Escalation: {$ticketNum} - {$title}",
+            'approval_required' => "Approval Required: {$ticketNum} - {$title}",
+            'approval_decided' => "Approval Update: {$ticketNum} - {$title}",
+            'reopened' => "Ticket Reopened: {$ticketNum} - {$title}",
+            default => "Update: {$ticketNum} - {$title}",
         };
     }
 }

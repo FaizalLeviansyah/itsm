@@ -17,7 +17,7 @@ class Ticket extends Model
         'ticket_number', 'public_token', 'title', 'description', 'category_id', 'sub_category_id',
         'priority_id', 'requester_id', 'assigned_to', 'assigned_by', 'status',
         'impact', 'urgency', 'type', 'location', 'vessel_name', 'vessel_id',
-        'company_id', 'due_date', 'first_response_at', 'resolved_at', 'closed_at',
+        'company_id', 'vendor_id', 'due_date', 'first_response_at', 'resolved_at', 'closed_at',
         'assigned_at', 'resolution_notes', 'sla_breached',
     ];
 

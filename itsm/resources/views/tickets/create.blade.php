@@ -48,13 +48,12 @@
                                 <option value="all" class="bg-white text-gray-800 font-normal">📁 Semua User</option>
                                 <option value="office" class="bg-white text-gray-800 font-normal">🏢 Office (On-Shore)</option>
                                 <option value="vessel" class="bg-white text-gray-800 font-normal">🚢 Vessel (Off-Shore)</option>
-                                <option value="vendor" class="bg-white text-gray-800 font-normal">🤝 Vendor / Third-Party</option>
                             </select>
                         </div>
                         
                        <!-- On Behalf Select (Dengan event Listener onchange) -->
-                        <!-- On Behalf Select dengan Search Box Select2 -->
-                        <select name="requester_id" id="on_behalf_select" class="w-full select2-searchable">
+                       <!-- On Behalf Select dengan Search Box Select2 -->
+                       <select name="requester_id" id="on_behalf_select" class="w-full select2-searchable" onchange="handleRequesterChange(this)" {{ old('vendor_id') ? 'disabled' : '' }}>
                             <option value="" data-location="all" data-company="{{ auth()->user()->company->name ?? 'PT Amarin Ship Management' }}" data-requester-name="{{ auth()->user()->name }}" data-is-vendor="false" data-user-type="Office Employee">-- Buat Tiket Untuk Diri Sendiri ({{ auth()->user()->name }}) --</option>
                             @foreach(\App\Models\User::where('id', '!=', auth()->id())->where('is_active', true)->orderBy('name')->get() as $u)
                                 @php
@@ -271,6 +270,48 @@
                 </div>
             </div>
 
+                        <!-- DROPDOWN VENDOR / THIRD-PARTY (DENGAN PREVIEW REAL-TIME) -->
+            <!-- VENDOR / THIRD-PARTY SOURCE (EKSTERNAL) -->
+            <div class="bg-white rounded-xl border-2 border-amber-300 p-5 bg-amber-50/40 shadow-xs">
+                <h4 class="text-xs font-bold text-amber-900 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                    <i class="fas fa-building-user text-amber-600"></i> Vendor / 3rd Party Source
+                </h4>
+                <select name="vendor_id" id="vendor_select" onchange="handleVendorChange(this)" class="w-full border border-amber-300 rounded-lg px-3 py-2.5 text-sm bg-white font-medium" {{ old('requester_id') ? 'disabled' : '' }}>
+                    <option value="">-- Tanpa Vendor (Internal / On Behalf) --</option>
+                    @foreach($vendors as $v)
+                        <option value="{{ $v->id }}" 
+                                data-name="{{ $v->name }}" 
+                                data-code="{{ $v->code ?? '' }}" 
+                                data-pic="{{ $v->contact_person ?? '-' }}" 
+                                data-phone="{{ $v->phone ?? '-' }}"
+                                {{ old('vendor_id') == $v->id ? 'selected' : '' }}>
+                            {{ $v->name }} {{ $v->code ? '('.$v->code.')' : '' }}
+                        </option>
+                    @endforeach
+                </select>
+
+                <!-- REAL-TIME DETAIL VENDOR CARD -->
+                <div id="vendor_preview_box" class="mt-3 bg-white p-3 rounded-lg border border-amber-300 shadow-xs hidden">
+                    <div class="flex items-center justify-between border-b border-amber-100 pb-1.5 mb-2">
+                        <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 bg-amber-100 text-amber-900 rounded border border-amber-200">
+                            <i class="fas fa-handshake mr-1"></i> DELEGATED VENDOR
+                        </span>
+                        <span class="text-xs font-bold text-amber-800" id="vendor_code_display"></span>
+                    </div>
+                    <p class="text-xs font-bold text-gray-900" id="vendor_name_display"></p>
+                    <div class="mt-2 pt-2 border-t border-gray-100 text-[11px] text-gray-600 space-y-1">
+                        <p class="flex items-center gap-1.5">
+                            <i class="fas fa-user-tier text-amber-600 w-3.5"></i> PIC: <span class="font-semibold text-gray-800" id="vendor_pic_display">-</span>
+                        </p>
+                        <p class="flex items-center gap-1.5">
+                            <i class="fas fa-phone-alt text-amber-600 w-3.5"></i> Telp: <span class="font-semibold text-gray-800" id="vendor_phone_display">-</span>
+                        </p>
+                    </div>
+                </div>
+
+                <p class="text-[11px] text-amber-800 mt-2">Pilih ini jika tiket bersumber langsung dari pelaporan/ekskalasi Vendor pihak ketiga.</p>
+            </div>
+
             @if($assets->count() > 0)
             <div class="bg-white rounded-xl border border-gray-100 p-5">
                 <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Related Asset</h4>
@@ -475,6 +516,153 @@ function updateFileInputAndPreview() {
         container.classList.add('hidden');
     }
 }
+
+// Function untuk update Live Preview Vendor saat dropdown dipilih
+function updateVendorPreview(selectEl) {
+    const selectedOption = selectEl.options[selectEl.selectedIndex];
+    const previewBox = document.getElementById('vendor_preview_box');
+    const nameDisplay = document.getElementById('vendor_name_display');
+    const codeDisplay = document.getElementById('vendor_code_display');
+    const contactDisplay = document.getElementById('vendor_contact_display');
+
+    if (!selectedOption || !selectedOption.value) {
+        if (previewBox) previewBox.classList.add('hidden');
+        return;
+    }
+
+    const vendorName = selectedOption.text.split('(')[0].trim();
+    const vendorCode = selectedOption.getAttribute('data-code');
+    const vendorPic  = selectedOption.getAttribute('data-pic');
+    const vendorPhone = selectedOption.getAttribute('data-phone');
+
+    if (nameDisplay) nameDisplay.innerText = vendorName;
+    if (codeDisplay) codeDisplay.innerText = vendorCode ? `(${vendorCode})` : '';
+    if (contactDisplay) contactDisplay.innerText = `PIC: ${vendorPic} | Telp: ${vendorPhone}`;
+
+    if (previewBox) previewBox.classList.remove('hidden');
+}
+
+// Jalankan saat pertama kali halaman dimuat untuk mengecek jika ada old('vendor_id')
+$(document).ready(function() {
+    const vendorSelect = document.getElementById('vendor_select');
+    if (vendorSelect && vendorSelect.value) {
+        updateVendorPreview(vendorSelect);
+    }
+});
+
+// Logika Eksklusif: Jika Vendor dipilih, update Badge Kuning, Detail Card Vendor, & nonaktifkan On Behalf
+function handleVendorChange(vendorSelect) {
+    const onBehalfSelect = $('#on_behalf_select');
+    const badgeEl = document.getElementById('requester_type_badge');
+    const previewBox = document.getElementById('vendor_preview_box');
+    
+    if (vendorSelect.value) {
+        onBehalfSelect.val(null).trigger('change');
+        onBehalfSelect.prop('disabled', true);
+        
+        const selectedOpt = vendorSelect.options[vendorSelect.selectedIndex];
+        const vName = selectedOpt.getAttribute('data-name');
+        const vCode = selectedOpt.getAttribute('data-code');
+        const vPic = selectedOpt.getAttribute('data-pic') || '-';
+        const vPhone = selectedOpt.getAttribute('data-phone') || '-';
+
+        // 1. Update Additional Info Sidebar
+        document.getElementById('display_requester_name').innerText = `[Vendor Partner] ${vName} ${vCode ? '('+vCode+')' : ''}`;
+        
+        // From Company tetap menggunakan Perusahaan User / Vendor info
+        const compText = document.querySelector('.company-display-text');
+        if (compText) {
+            compText.innerText = `Third-Party Vendor (${vName})`;
+            compText.className = 'text-sm font-bold text-amber-600 company-display-text';
+        }
+
+        // 2. Update Requester Category Badge ke Kuning/Amber
+        if (badgeEl) {
+            badgeEl.className = 'inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 shadow-xs';
+            badgeEl.innerHTML = '<i class="fas fa-handshake text-[10px]"></i> Third-Party / Vendor';
+        }
+
+        // 3. Update Real-time Detail Card Vendor di Bawah Dropdown
+        document.getElementById('vendor_name_display').innerText = vName;
+        document.getElementById('vendor_code_display').innerText = vCode ? `(${vCode})` : '';
+        document.getElementById('vendor_pic_display').innerText = vPic;
+        document.getElementById('vendor_phone_display').innerText = vPhone;
+        if (previewBox) previewBox.classList.remove('hidden');
+
+    } else {
+        onBehalfSelect.prop('disabled', false);
+        document.getElementById('display_requester_name').innerText = "{{ auth()->user()->name }}";
+        
+        const compText = document.querySelector('.company-display-text');
+        if (compText) {
+            compText.innerText = "{{ auth()->user()->company->name ?? 'PT Amarin Ship Management' }}";
+            compText.className = 'text-sm font-bold text-brand-600 company-display-text';
+        }
+
+        // Reset Badge ke Office Employee (Biru)
+        if (badgeEl) {
+            badgeEl.className = 'inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200';
+            badgeEl.innerHTML = '<i class="fas fa-user-check text-[10px]"></i> Office Employee';
+        }
+
+        // Sembunyikan Detail Card Vendor
+        if (previewBox) previewBox.classList.add('hidden');
+    }
+}
+
+// Logika Eksklusif: Jika On Behalf dipilih, kembalikan state
+function handleRequesterChange(selectEl) {
+    const vendorSelect = document.getElementById('vendor_select');
+    const badgeEl = document.getElementById('requester_type_badge');
+    const previewBox = document.getElementById('vendor_preview_box');
+    const selectedOpt = selectEl.options[selectEl.selectedIndex];
+
+    if (selectEl.value) {
+        vendorSelect.value = "";
+        vendorSelect.disabled = true;
+        if (previewBox) previewBox.classList.add('hidden');
+
+        const reqName = selectedOpt.getAttribute('data-requester-name');
+        const compName = selectedOpt.getAttribute('data-company');
+        const userType = selectedOpt.getAttribute('data-user-type') || 'Office Employee';
+        const isVessel = userType.includes('Vessel');
+
+        document.getElementById('display_requester_name').innerText = reqName;
+        
+        const compText = document.querySelector('.company-display-text');
+        if (compText) compText.innerText = compName;
+
+        // Update Badge Sesuai User On Behalf
+        if (badgeEl) {
+            if (isVessel) {
+                badgeEl.className = 'inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 shadow-xs';
+                badgeEl.innerHTML = '<i class="fas fa-ship text-[10px]"></i> ' + userType;
+            } else {
+                badgeEl.className = 'inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 shadow-xs';
+                badgeEl.innerHTML = '<i class="fas fa-user-check text-[10px]"></i> ' + userType;
+            }
+        }
+    } else {
+        vendorSelect.disabled = false;
+        document.getElementById('display_requester_name').innerText = "{{ auth()->user()->name }}";
+        
+        const compText = document.querySelector('.company-display-text');
+        if (compText) compText.innerText = "{{ auth()->user()->company->name ?? 'PT Amarin Ship Management' }}";
+
+        if (badgeEl) {
+            badgeEl.className = 'inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200';
+            badgeEl.innerHTML = '<i class="fas fa-user-check text-[10px]"></i> Office Employee';
+        }
+    }
+}
+
+// Cek otomatis saat halaman dimuat jika ada old('vendor_id')
+$(document).ready(function() {
+    const vendorSelect = document.getElementById('vendor_select');
+    if (vendorSelect && vendorSelect.value) {
+        handleVendorChange(vendorSelect);
+    }
+});c
 
 function loadSubCategories(categoryId) {
     const wrap = document.getElementById('subcategory-wrap');

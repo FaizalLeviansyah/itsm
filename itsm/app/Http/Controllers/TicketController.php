@@ -56,14 +56,19 @@ class TicketController extends Controller
                 $recipients[] = $hendriUser->phone;
             }
 
-            // Format Pesan WhatsApp
-            $message  = "*[ADMIN ALERT - TICKET UPDATE]*\n\n";
-            $message .= "Ticket: *{$ticket->ticket_number}*\n";
-            $message .= "Title: {$ticket->title}\n";
-            $message .= "Action: *{$actionName}*\n";
-            $message .= "By: " . Auth::user()->name . "\n";
+            // Format Pesan WhatsApp Lebih Detil
+            $message  = "📢 *[ADMIN ALERT - TICKET UPDATE]*\n\n";
+            $message .= "• Ticket ID: *{$ticket->ticket_number}*\n";
+            $message .= "• Title: {$ticket->title}\n";
+            $message .= "• Action: *{$actionName}*\n";
+            $message .= "• Created By: " . Auth::user()->name . "\n";
+            
+            if ($ticket->vendor) {
+                $message .= "• Source: *Vendor {$ticket->vendor->name}*\n";
+            }
+            
             if ($extraNote) {
-                $message .= "Note: {$extraNote}\n";
+                $message .= "\n📝 *Details / Notes:*\n{$extraNote}\n";
             }
 
             // Kirim pesan ke setiap penerima dalam daftar
@@ -219,25 +224,32 @@ class TicketController extends Controller
 
     public function store(Request $request)
     {
-        // 1. Validasi Input Form (TAMPUNG KE $validatedData)
+        // 1. Validasi Input Form (Tambahkan vendor_id & validasi minimal salah satu terisi)
         $validatedData = $request->validate([
-            'requester_id' => 'nullable|exists:users,id', // Validasi On Behalf Of
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'category_id' => 'required|exists:categories,id',
+            'requester_id' => 'nullable|exists:users,id',
+            'vendor_id'    => 'nullable|exists:vendors,id',
+            'title'        => 'required|string|max:255',
+            'description'  => 'required|string',
+            'category_id'  => 'required|exists:categories,id',
             'sub_category_id' => 'nullable|exists:sub_categories,id',
-            'priority_id' => 'required|exists:priorities,id',
+            'priority_id'  => 'required|exists:priorities,id',
             'request_type' => 'required|in:incident,service_request,problem,change_request', 
-            'impact' => 'nullable|string',
-            'urgency' => 'nullable|string',
-            'location' => 'nullable|string|max:255',
-            'vessel_name' => 'nullable|string|max:255',
-            'asset_id' => 'nullable|exists:assets,id',
+            'impact'       => 'nullable|string',
+            'urgency'      => 'nullable|string',
+            'location'     => 'nullable|string|max:255',
+            'vessel_name'  => 'nullable|string|max:255',
+            'asset_id'     => 'nullable|exists:assets,id',
             'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx,mp4,mov,avi|max:20480', 
         ], [
-            'attachments.*.mimes' => 'Format file lampiran tidak diizinkan. Gunakan JPG, PNG, PDF, Office, atau Video (MP4/AVI).',
-            'attachments.*.max' => 'Ukuran setiap file lampiran maksimal 20MB.'
+            'attachments.*.mimes' => 'Format file lampiran tidak diizinkan.',
+            'attachments.*.max' => 'Ukuran file maksimal 20MB.'
         ]);
+
+        // Pastikan minimal salah satu (requester_id atau vendor_id) terisi jika role admin/technician
+        if (in_array(Auth::user()->role, ['admin', 'technician']) && empty($request->requester_id) && empty($request->vendor_id)) {
+            // Jika dikosongkan keduanya, default-kan requester ke diri sendiri (internal)
+            $actualRequesterId = Auth::id();
+        }
 
         $priority = Priority::find($request->priority_id);
         $ticketType = $validatedData['request_type'];
@@ -272,17 +284,17 @@ class TicketController extends Controller
             $approvalType  = 'on_behalf';
         }
 
-        // 4. Pembuatan Data Tiket
+        // 4. Pembuatan Data Tiket (Tangkap vendor_id dengan aman)
         $ticket = Ticket::create([
             'ticket_number' => Ticket::generateTicketNumber(),
             'public_token'  => Str::random(40),
             'title'         => $validatedData['title'],
             'description'   => $validatedData['description'],
-            'vendor_id'     => $request->vendor_id ?? null,
+            'vendor_id'     => $request->filled('vendor_id') ? $request->vendor_id : null,
             'category_id'   => $validatedData['category_id'],
             'sub_category_id' => $validatedData['sub_category_id'] ?? null,
             'priority_id'   => $validatedData['priority_id'],
-            'requester_id'  => $actualRequesterId,
+            'requester_id'  => $request->filled('vendor_id') ? Auth::id() : $actualRequesterId, // Jika vendor, pembuat log perwakilan adalah IT yang login
             'company_id'    => $actualCompanyId,
             'type'          => $validatedData['request_type'],
             'impact'        => $request->impact ?? 'low',
@@ -290,7 +302,7 @@ class TicketController extends Controller
             'location'      => $request->location,
             'vessel_name'   => $request->vessel_name,
             'status'        => $initialStatus,
-            'assigned_to'   => null, // Murni Unassigned agar tidak melangkahi Approval Head IT
+            'assigned_to'   => null,
             'assigned_by'   => null,
             'due_date'      => $this->slaCalculator->calculateDueDate(now(), $priority->sla_hours ?? 24),
         ]);
@@ -366,20 +378,35 @@ class TicketController extends Controller
         ]);
 
         // 9. Kirim Notifikasi
-        $ticket->load(['requester', 'priority', 'category', 'company', 'attachments']);
+        // 9. Kirim Notifikasi (Integrasi Lengkap Vendor & On Behalf)
+        $ticket->load(['requester', 'priority', 'category', 'company', 'vendor', 'attachments']);
         
         $extraNote = 'Kategori: ' . $ticket->category->name;
+        
+        // Tambahkan Informasi Vendor Jika Tiket Berasal dari Vendor
+        if ($ticket->vendor) {
+            $extraNote .= "\n\n🏢 *DELEGATED VENDOR SOURCE:*";
+            $extraNote .= "\n• Vendor: " . $ticket->vendor->name . ($ticket->vendor->code ? " ({$ticket->vendor->code})" : "");
+            $extraNote .= "\n• PIC: " . ($ticket->vendor->contact_person ?? '-');
+            $extraNote .= "\n• Telp: " . ($ticket->vendor->phone ?? '-');
+        }
+
         if ($isOnBehalf) {
             $extraNote .= "\n\n⚠️ *MEMBUTUHKAN APPROVAL (ON BEHALF OF)* oleh Admin/Atasan.";
         }
+        
         if ($ticket->attachments->count() > 0) {
             $extraNote .= "\n\n*Lampiran:* Tersedia " . $ticket->attachments->count() . " file/video.";
-            $extraNote .= "\nAkses detail tiket: " . route('tickets.show', $ticket->id);
         }
+        
+        $extraNote .= "\n\n👉 *Akses Detail Tiket:* " . route('tickets.show', $ticket->id);
 
         try {
             $this->waService->notifyTicketCreated($ticket);
-            $this->notifyAdminViaWa($ticket, $isOnBehalf ? 'Ticket On Behalf Created (Needs Approval)' : 'Ticket Created', $extraNote);
+            
+            $actionTitle = $ticket->vendor ? 'Ticket Created via Vendor (' . $ticket->vendor->name . ')' : ($isOnBehalf ? 'Ticket On Behalf Created (Needs Approval)' : 'Ticket Created');
+            
+            $this->notifyAdminViaWa($ticket, $actionTitle, $extraNote);
 
             $admins = User::where('role', 'admin')->get();
             foreach ($admins as $admin) {
@@ -936,30 +963,39 @@ class TicketController extends Controller
         }
 
         $request->validate([
-            'ratings'    => 'required|array',
-            'ratings.*'  => 'required|integer|min:1|max:5',
+            'ratings'    => 'nullable|array',
             'feedbacks'  => 'nullable|array',
             'feedback'   => 'nullable|string|max:1000'
         ]);
 
-        $ticket->load('requester');
-        $requesterId   = $ticket->requester_id;
-        $requesterName = $ticket->requester?->name ?? 'Requester';
+        $ticket->load(['requester', 'assignedTechnicians', 'assignee']);
+        $requesterId   = $ticket->requester_id ?? Auth::id();
+        $requesterName = $ticket->requester?->name ?? Auth::user()->name ?? 'Requester';
 
         $ratingsArray = $request->input('ratings', []);
         $feedbacksArray = $request->input('feedbacks', []);
 
-        $avgRating = count($ratingsArray) > 0 ? array_sum($ratingsArray) / count($ratingsArray) : 5;
-        $firstTechId = array_key_first($ratingsArray) ?? $ticket->assigned_to;
+        // Filter hanya nilai rating yang terisi valid (1-5)
+        $validRatings = array_filter($ratingsArray, function($v) {
+            return is_numeric($v) && $v >= 1 && $v <= 5;
+        });
 
-        // Susun detail rating per teknisi dengan aman (pastikan teks tidak kosong agar tertulis)
+        $avgRating = count($validRatings) > 0 ? array_sum($validRatings) / count($validRatings) : 5;
+        
+        // Ambil ID teknisi pertama yang ter-assign, fallback ke assigned_to, atau ID user aktif
+        $firstTechId = !empty($validRatings) ? array_key_first($validRatings) : ($ticket->assigned_to ?? $ticket->assignedTechnicians->first()?->id ?? Auth::id());
+
+        // Susun detail ulasan per teknisi
         $detailedFeedbackArr = [];
-        foreach ($ratingsArray as $techId => $score) {
-            $techModel = User::find($techId);
-            $techName = $techModel ? $techModel->name : 'Technician';
-            // Jika feedback kosong, berikan teks default agar tetap ter-generate ke database & notifikasi WA
-            $techComment = !empty($feedbacksArray[$techId]) ? $feedbacksArray[$techId] : 'respon cepat dan langsung di perbaiki';
-            $detailedFeedbackArr[] = "{$techName}: {$score}/5 Stars (Note: {$techComment})";
+        if (!empty($validRatings)) {
+            foreach ($validRatings as $techId => $score) {
+                $techModel = User::find($techId);
+                $techName = $techModel ? $techModel->name : 'Technician';
+                $techComment = !empty($feedbacksArray[$techId]) ? $feedbacksArray[$techId] : 'Layanan sangat baik dan cepat ditangani.';
+                $detailedFeedbackArr[] = "{$techName}: {$score}/5 Stars (Note: {$techComment})";
+            }
+        } else {
+            $detailedFeedbackArr[] = "General Rating: " . round($avgRating) . "/5 Stars";
         }
         
         $combinedFeedback = implode(" | ", $detailedFeedbackArr);
@@ -967,16 +1003,19 @@ class TicketController extends Controller
             $combinedFeedback .= " [Overall Feedback: " . $request->feedback . "]";
         }
 
-        // Simpan Rating ke Database
-        $ticket->rating()->create([
-            'user_id'                 => $requesterId, 
-            'technician_id'           => $firstTechId, 
-            'rating'                  => round($avgRating),
-            'feedback'                => $combinedFeedback,
-            'resolution_time_minutes' => $ticket->resolution_time,
-        ]);
+        // Simpan atau Update Rating di Database
+        $ticket->rating()->updateOrCreate(
+            ['ticket_id' => $ticket->id],
+            [
+                'user_id'                 => $requesterId, 
+                'technician_id'           => $firstTechId, 
+                'rating'                  => round($avgRating),
+                'feedback'                => $combinedFeedback,
+                'resolution_time_minutes' => $ticket->resolution_time,
+            ]
+        );
 
-        // Ubah Status Menjadi Closed
+        // Ubah Status Tiket Menjadi Closed
         $ticket->update([
             'status'    => 'closed',
             'closed_at' => now(),
@@ -988,16 +1027,13 @@ class TicketController extends Controller
             'field'     => 'status',
             'old_value' => 'resolved',
             'new_value' => 'closed',
-            'note'      => "Tiket diselesaikan dan diulas oleh requester ({$requesterName}) dengan rating: " . round($avgRating) . ' Bintang',
+            'note'      => "Tiket diselesaikan dan diulas oleh {$requesterName} dengan rating: " . round($avgRating) . ' Bintang',
         ]);
 
-        // EKSEKUSI PENGIRIMAN WHATSAPP (DIJAMIN TIDAK TERLEWAT)
+        // Eksekusi Notifikasi WhatsApp
         try {
-            $ticket->load(['assignee', 'assignedTechnicians', 'rating']);
-            
-            // Panggil service WhatsApp secara langsung
             $this->waService->notifyTicketClosed($ticket);
-            $this->notifyAdminViaWa($ticket, 'Ticket Closed & Rated', 'Requester: ' . $requesterName . ' | Rating: ' . round($avgRating) . '/5');
+            $this->notifyAdminViaWa($ticket, 'Ticket Closed & Rated', "Requester: {$requesterName} | Rating: " . round($avgRating) . "/5\nFeedback: {$combinedFeedback}");
 
             if ($ticket->assignee) {
                 $ticket->assignee->notify(new TicketNotification($ticket, 'closed'));

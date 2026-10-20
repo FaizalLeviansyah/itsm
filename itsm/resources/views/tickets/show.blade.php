@@ -547,17 +547,28 @@
                 </div>
 
                 <!-- Informasi Vendor / Third-Party yang Menangani Tiket -->
+                <!-- Label Informasi Vendor / Third-Party -->
                 @if($ticket->vendor)
-                <div class="flex justify-between items-center bg-purple-50 px-2.5 py-2 rounded-lg border border-purple-200 my-2">
-                    <span class="text-purple-700 text-xs font-bold flex items-center gap-1.5">
-                        <i class="fas fa-handshake text-purple-600"></i> Vendor / 3rd Party
-                    </span>
-                    <span class="text-purple-900 font-bold text-xs text-right">
-                        {{ $ticket->vendor->name }}
-                    </span>
+                <div class="bg-amber-50 p-3 rounded-xl border-2 border-amber-300 shadow-xs my-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-amber-900 uppercase tracking-wide flex items-center gap-1.5">
+                            <i class="fas fa-building-user text-amber-600"></i> Assigned Vendor
+                        </span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-200 text-amber-900">3RD PARTY</span>
+                    </div>
+                    <div class="text-sm font-bold text-gray-900 mt-1 flex items-center justify-between">
+                        <span>{{ $ticket->vendor->name }}</span>
+                        @if($ticket->vendor->code)
+                            <span class="text-xs font-semibold text-amber-800">({{ $ticket->vendor->code }})</span>
+                        @endif
+                    </div>
+                    @if($ticket->vendor->contact_person || $ticket->vendor->phone)
+                        <div class="text-[11px] text-amber-800 mt-1 pt-1 border-t border-amber-200/60">
+                            PIC: {{ $ticket->vendor->contact_person ?? '-' }} ({{ $ticket->vendor->phone ?? '-' }})
+                        </div>
+                    @endif
                 </div>
                 @endif
-                
                 @if($reqUser?->department)
                 <div class="flex justify-between">
                     <span class="text-gray-500 text-xs">Department</span>

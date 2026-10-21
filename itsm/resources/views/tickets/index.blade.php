@@ -86,9 +86,11 @@
 
             <!-- Search & Action Buttons -->
             <div class="flex items-center gap-2 lg:col-span-6 pt-2 border-t border-gray-100 justify-between">
-                <div class="relative flex-1 max-w-md">
+                <div class="relative flex-1 max-w-lg">
                     <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
-                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Search Ticket ID / Title..." class="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-xs bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition">
+                    <input type="text" name="search" value="{{ request('search') }}" 
+                           placeholder="Smart Search (ID, Title, Email, Dept, Name, Vessel, Vendor)..." 
+                           class="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-xs bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition shadow-2xs">
                 </div>
                 <div class="flex items-center gap-2">
                     <button type="submit" class="bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2 px-4 rounded-lg text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer">

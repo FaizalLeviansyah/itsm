@@ -184,13 +184,56 @@ class TicketController extends Controller
             }
         }
 
-        // Filter berdasarkan Search (ID / Title)
         if ($request->filled('search')) {
-            $query->where(function ($q) use ($request) {
-                $q->where('ticket_number', 'like', "%{$request->search}%")
-                  ->orWhere('title', 'like', "%{$request->search}%");
-            });
-        }
+    $search = trim($request->search);
+    $query->where(function($q) use ($search) {
+        // 1. Cari di Kolom Utama Tiket
+        $q->where('ticket_number', 'like', "%{$search}%")
+          ->orWhere('title', 'like', "%{$search}%")
+          ->orWhere('description', 'like', "%{$search}%")
+          ->orWhere('vessel_name', 'like', "%{$search}%")
+
+        // 2. Cari di Data Requester (Pembuat Tiket)
+          ->orWhereHas('requester', function($rq) use ($search) {
+              $rq->where('full_name', 'like', "%{$search}%")
+                 ->orWhere('name', 'like', "%{$search}%")
+                 ->orWhere('email', 'like', "%{$search}%")
+                 ->orWhere('department', 'like', "%{$search}%")
+                 ->orWhere('position', 'like', "%{$search}%")
+                 ->orWhere('job_title', 'like', "%{$search}%")
+                 ->orWhere('employee_number', 'like', "%{$search}%");
+          })
+
+        // 3. Cari di Data Perusahaan (Company)
+          ->orWhereHas('company', function($cq) use ($search) {
+              $cq->where('name', 'like', "%{$search}%");
+          })
+
+        // 4. Cari di Data Kategori & Prioritas
+          ->orWhereHas('category', function($catQ) use ($search) {
+              $catQ->where('name', 'like', "%{$search}%");
+          })
+          ->orWhereHas('priority', function($prioQ) use ($search) {
+              $prioQ->where('name', 'like', "%{$search}%");
+          })
+
+        // 5. Cari di Data Teknisi / Assignee
+          // 5. Cari di Data Teknisi / Assignee (Single & Multiple Assignees)
+          ->orWhereHas('assignedTechnicians', function($techQ) use ($search) {
+              $techQ->where('full_name', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%");
+          })
+          ->orWhereHas('assignee', function($assigneeQ) use ($search) {
+              $assigneeQ->where('full_name', 'like', "%{$search}%")
+                        ->orWhere('name', 'like', "%{$search}%");
+          })
+
+        // 6. Cari di Data Vendor Pihak Ketiga
+          ->orWhereHas('vendor', function($vQ) use ($search) {
+              $vQ->where('name', 'like', "%{$search}%");
+          });
+    });
+}
 
         $tickets = $query->orderByDesc('created_at')->paginate(15)->withQueryString();
         $priorities = Priority::all();
@@ -1092,11 +1135,54 @@ class TicketController extends Controller
             }
         }
         if ($request->filled('search')) {
-            $query->where(function ($q) use ($request) {
-                $q->where('ticket_number', 'like', "%{$request->search}%")
-                  ->orWhere('title', 'like', "%{$request->search}%");
-            });
-        }
+    $search = trim($request->search);
+    $query->where(function($q) use ($search) {
+        // 1. Cari di Kolom Utama Tiket
+        $q->where('ticket_number', 'like', "%{$search}%")
+          ->orWhere('title', 'like', "%{$search}%")
+          ->orWhere('description', 'like', "%{$search}%")
+          ->orWhere('vessel_name', 'like', "%{$search}%")
+
+        // 2. Cari di Data Requester (Pembuat Tiket)
+          ->orWhereHas('requester', function($rq) use ($search) {
+              $rq->where('full_name', 'like', "%{$search}%")
+                 ->orWhere('name', 'like', "%{$search}%")
+                 ->orWhere('email', 'like', "%{$search}%")
+                 ->orWhere('department', 'like', "%{$search}%")
+                 ->orWhere('position', 'like', "%{$search}%")
+                 ->orWhere('job_title', 'like', "%{$search}%")
+                 ->orWhere('employee_number', 'like', "%{$search}%");
+          })
+
+        // 3. Cari di Data Perusahaan (Company)
+          ->orWhereHas('company', function($cq) use ($search) {
+              $cq->where('name', 'like', "%{$search}%");
+          })
+
+        // 4. Cari di Data Kategori & Prioritas
+          ->orWhereHas('category', function($catQ) use ($search) {
+              $catQ->where('name', 'like', "%{$search}%");
+          })
+          ->orWhereHas('priority', function($prioQ) use ($search) {
+              $prioQ->where('name', 'like', "%{$search}%");
+          })
+
+          // 5. Cari di Data Teknisi / Assignee (Single & Multiple Assignees)
+          ->orWhereHas('assignedTechnicians', function($techQ) use ($search) {
+              $techQ->where('full_name', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%");
+          })
+          ->orWhereHas('assignee', function($assigneeQ) use ($search) {
+              $assigneeQ->where('full_name', 'like', "%{$search}%")
+                        ->orWhere('name', 'like', "%{$search}%");
+          })
+
+        // 6. Cari di Data Vendor Pihak Ketiga
+          ->orWhereHas('vendor', function($vQ) use ($search) {
+              $vQ->where('name', 'like', "%{$search}%");
+          });
+    });
+}
 
         $tickets = $query->orderByDesc('created_at')->paginate(15)->withQueryString();
         $priorities = Priority::all();

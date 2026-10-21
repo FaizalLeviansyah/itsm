@@ -7,7 +7,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class KnowledgeArticle extends Model
 {
-    protected $fillable = ['title', 'slug', 'content', 'category_id', 'author_id', 'status', 'views', 'helpful_count'];
+    protected $fillable = [
+        'title', 
+        'slug', 
+        'content', 
+        'pdf_path', // <-- Kolom untuk menyimpan direktori file Ebook PDF
+        'category_id', 
+        'author_id', 
+        'status', 
+        'views', 
+        'helpful_count'
+    ];
 
     public function category(): BelongsTo
     {

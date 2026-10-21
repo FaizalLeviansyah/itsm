@@ -115,32 +115,22 @@ class SocIntegrationService
         }
         
         // --- LOGIK BARU: OTOMATISASI PEMBUATAN USER ---
+        // --- MATCHING USER RESMI DARI MASTER API (TIDAK ADA PEMBUATAN USER DUMMY) ---
+        $asset->assigned_to = null; // Default unassigned jika tidak ditemukan
+        
         if (!empty($endpoint['alias'])) {
-            // Coba cari user berdasarkan namanya
-            $user = \App\Models\User::where('name', $endpoint['alias'])->first();
+            // Cari user resmi di ITSM berdasarkan full_name atau name (bukan email dummy soc-sync)
+            $user = \App\Models\User::where(function($q) use ($endpoint) {
+                $q->where('full_name', 'LIKE', trim($endpoint['alias']))
+                  ->orWhere('name', 'LIKE', trim($endpoint['alias']));
+            })->where('email', 'NOT LIKE', '%@soc-sync.local')->first();
             
-            // Jika user belum ada di ITSM, buatkan secara otomatis
-            if (!$user) {
-                // Buat email dummy yang unik berdasarkan nama
-                $cleanName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $endpoint['alias']));
-                $emailDummy = $cleanName . '@soc-sync.local';
-                
-                // Pastikan email tidak duplikat
-                $existingEmail = \App\Models\User::where('email', $emailDummy)->first();
-                if (!$existingEmail) {
-                    $user = \App\Models\User::create([
-                        'name' => $endpoint['alias'],
-                        'email' => $emailDummy,
-                        'password' => bcrypt('password123'), // Password dummy default
-                    ]);
-                }
-            }
-            
-            // Assign ID user ke asset
+            // Jika user resmi ditemukan, hubungkan aset ke user tersebut
             if ($user) {
                 $asset->assigned_to = $user->id;
             }
         }
+        // --------------------------------------------------------------------------
         // ----------------------------------------------
 
         $asset->soc_synced_at = now();

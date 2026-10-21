@@ -13,10 +13,17 @@ class User extends Authenticatable
     use HasFactory, Notifiable;
 
     protected $fillable = [
-        'name', 'email', 'password', 'phone', 'department',
+        'name', 'full_name', 'email', 'password', 'phone', 'department',
         'position', 'avatar', 'role', 'source', 'source_id', 'company_id', 'is_active',
-        'employee_number', 'job_title', // <-- Tambahan dari API
+        'employee_number', 'job_title', // <-- Menambahkan full_name agar diizinkan di-update oleh Sync
     ];
+
+    public function getNameAttribute($value): string
+    {
+        return !empty($this->attributes['full_name'])
+            ? $this->attributes['full_name']
+            : ($value ?? 'User');
+    }
 
     protected $hidden = ['password', 'remember_token'];
 
@@ -104,12 +111,5 @@ class User extends Authenticatable
     public function hasRole(string $role): bool
     {
         return $this->role === $role;
-    }
-
-    public function getNameAttribute($value): string
-    {
-        return !empty($this->attributes['full_name'])
-            ? $this->attributes['full_name']
-            : ($value ?? 'User');
     }
 }

@@ -241,24 +241,37 @@
                     <td class="px-6 py-4">
                         @php
                             $reqUser = $ticket->requester;
-                            $rawReqName = $reqUser->name ?? 'Unknown';
-                            $reqJobTitle = $reqUser->job_title ?? '';
-                            $reqEmpNumber = $reqUser->employee_number ?? $rawReqName;
+                            $reqName = $reqUser->full_name ?? $reqUser->name ?? 'Unknown User';
                             
-                            // Cek apakah name hanya berisi NIK/angka
-                            $isReqNameNumeric = preg_match('/^[P]?\d+$/', $rawReqName);
-                            
-                            if ($isReqNameNumeric && $reqJobTitle) {
-                                $reqName = strtoupper($reqJobTitle);
-                            } else {
-                                $reqName = $rawReqName;
-                            }
+                            // Deteksi apakah ini pelaporan dari Vessel / Kapal
+                            $isVesselAccount = ($reqUser->source === 'vessel_api') 
+                                || str_contains(strtolower($reqUser->department ?? ''), 'vessel')
+                                || str_contains(strtolower($reqUser->position ?? ''), 'vessel')
+                                || !empty($ticket->vessel_name);
+
+                            // Tentukan Nama Kapal yang tampil
+                            $vesselLabel = !empty($ticket->vessel_name) 
+                                ? $ticket->vessel_name 
+                                : (str_contains($reqUser->position ?? '', 'Vessel - ') 
+                                    ? str_replace('Vessel - ', '', $reqUser->position) 
+                                    : ($reqUser->department ?? 'Vessel'));
                         @endphp
-                        <div class="flex items-center gap-2">
-                            <div class="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center">
-                                <span class="text-[9px] font-bold text-gray-600">{{ strtoupper(substr($reqName, 0, 2)) }}</span>
+                        <div class="flex flex-col gap-0.5">
+                            <div class="flex items-center gap-2">
+                                <div class="w-6 h-6 {{ $isVesselAccount ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600' }} rounded-full flex items-center justify-center">
+                                    <span class="text-[9px] font-bold">
+                                        {{ strtoupper(substr($reqName, 0, 2)) }}
+                                    </span>
+                                </div>
+                                <span class="text-sm font-semibold text-gray-800">{{ Str::limit($reqName, 22) }}</span>
                             </div>
-                            <span class="text-sm text-gray-700">{{ Str::limit($reqName, 20) }}</span>
+
+                            <!-- BADGE IDENTITAS KAPAL (MNC/VESSEL) -->
+                            @if($isVesselAccount)
+                                <span class="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded w-max ml-8">
+                                    <i class="fas fa-ship text-[9px] text-amber-600"></i> {{ Str::limit($vesselLabel, 20) }}
+                                </span>
+                            @endif
                         </div>
                     </td>
                     <td class="px-6 py-4">

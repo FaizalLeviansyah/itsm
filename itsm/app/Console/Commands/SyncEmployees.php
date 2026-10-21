@@ -41,19 +41,11 @@ class SyncEmployees extends Command
                 foreach ($employees as $emp) {
                     $emp = (object) $emp;
 
-                    $email = $emp->email_work ?? $emp->email ?? null;
+                   $email = $emp->email_work ?? $emp->email ?? null;
                     if (!$email) continue;
 
-                    // Ambil full_name atau name asli dari API, pastikan bukan berupa email
-                    $rawName = $emp->full_name ?? $emp->employee_name ?? $emp->name ?? null;
-                    
-                    if (!$rawName || str_contains($rawName, '@')) {
-                        // Jika kosong atau isinya email, buatkan nama rapi dari prefix email
-                        $name = ucwords(str_replace(['.', '_'], ' ', explode('@', $email)[0]));
-                    } else {
-                        // Gunakan full_name asli dari API master
-                        $name = trim($rawName);
-                    }
+                    // MURNI mengambil dari kolom full_name / name asli database API Master (Tanpa manipulasi email)
+                    $name = !empty($emp->full_name) ? trim($emp->full_name) : (!empty($emp->name) ? trim($emp->name) : null);
 
                     $lowerEmail = strtolower(trim($email));
                     $rawTitle = $emp->job_title ?? $emp->position ?? '';
@@ -155,21 +147,41 @@ class SyncEmployees extends Command
 
                     $email = $vessel['login_email'] ?? strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $vesselName)) . '@vessel.amarin.biz.id';
 
-                    User::updateOrCreate(
-                        ['email' => strtolower(trim($email))],
-                        [
-                            'name'       => $vesselName,
-                            'full_name'  => $vesselName,
-                            'password'   => $vessel['login_password'] ?? $vessel['password'] ?? bcrypt('vesselpassword'),
-                            'role'       => 'user',
-                            'department' => 'Vessel',
-                            'job_title'  => 'Vessel',
-                            'position'   => 'Vessel - ' . $vesselName,
-                            'source'     => 'vessel_api',
-                            'source_id'  => $vessel['id'] ?? null,
-                            'is_active'  => true,
-                        ]
-                    );
+                    $user = User::where('email', strtolower(trim($email)))->first();
+
+                    if ($user) {
+                        // Jika user sudah ada di DB lokal, paksa update nama & full_name dari API Master
+                        $user->update([
+                            'name'            => $name,
+                            'full_name'       => $name,
+                            'employee_number' => $emp->employee_number ?? $user->employee_number,
+                            'role'            => $role,
+                            'department'      => $rawDept ?: $user->department,
+                            'job_title'       => $rawTitle ?: $user->job_title,
+                            'position'        => $rawTitle ?: $user->position,
+                            'phone'           => $phone ?: $user->phone,
+                            'company_id'      => $emp->company_id ?? $user->company_id,
+                            'is_active'       => true,
+                            'source'          => 'employee_api'
+                        ]);
+                    } else {
+                        // Jika user baru, buat data baru
+                        User::create([
+                            'email'           => strtolower(trim($email)),
+                            'name'            => $name,
+                            'full_name'       => $name,
+                            'employee_number' => $emp->employee_number ?? null,
+                            'password'        => $emp->password ?? bcrypt('defaultpassword'),
+                            'role'            => $role,
+                            'department'      => $rawDept ?: null,
+                            'job_title'       => $rawTitle ?: null,
+                            'position'        => $rawTitle ?: null,
+                            'phone'           => $phone,
+                            'company_id'      => $emp->company_id ?? null,
+                            'is_active'       => true,
+                            'source'          => 'employee_api'
+                        ]);
+                    }
                     $totalVesselSynced++;
                 }
                 $this->info("Successfully synchronized {$totalVesselSynced} vessels.");

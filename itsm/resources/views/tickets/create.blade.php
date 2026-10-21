@@ -62,12 +62,7 @@
                                     
                                     $locationType = $isVendor ? 'vendor' : ($isVessel ? 'vessel' : 'office');
                                     
-                                    $displayName = $u->name;
-                                    if (preg_match('/^[P]?\d+$/', $displayName)) {
-                                        $displayName = !empty($u->position) && !preg_match('/^[P]?\d+$/', $u->position) 
-                                            ? $u->position 
-                                            : ucwords(str_replace(['.', '_'], ' ', explode('@', $u->email)[0]));
-                                    }
+                                    $displayName = $u->full_name ?? $u->name ?? 'Unknown User';
 
                                     $jobTitle = $u->job_title ?? ($u->position ?? '');
                                     $companyName = $u->company->name ?? 'PT Amarin Ship Management';

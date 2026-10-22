@@ -635,6 +635,9 @@ class TicketController extends Controller
         // ==========================================
         // TAMBAHAN: AUTO-ASSIGN JIKA MASIH UNASSIGNED & YANG INTERAKSI ADMIN/TEKNISI
         // ==========================================
+        // ==========================================
+        // AUTO-ASSIGN JIKA MASIH UNASSIGNED & YANG INTERAKSI ADMIN/TEKNISI
+        // ==========================================
         if (empty($ticket->assigned_to) && $ticket->assignedTechnicians->isEmpty() && in_array(Auth::user()->role, ['admin', 'technician'])) {
             $ticket->update([
                 'assigned_to' => Auth::id(),
@@ -657,57 +660,41 @@ class TicketController extends Controller
         // ==========================================
 
         $oldStatus = $ticket->status;
+        
+        // KUNCI MATI STATUS: Status murni mengikuti pilihan aktif Admin / Teknisi yang sedang login
         $data = ['status' => $request->status];
 
-       if ($oldStatus === 'pending' && $ticket->approvals()->where('status', 'pending')->exists()) {
-            $approvalStatus = $request->status === 'cancelled' ? 'rejected' : 'approved';
+        // Jika ada antrean approval pending (Kasus On-Behalf / Change Request), selesaikan otomatis & kirim WhatsApp Alert ke Admin
+        if ($ticket->approvals()->where('status', 'pending')->exists()) {
+            $approvalStatus = ($request->status === 'cancelled') ? 'rejected' : 'approved';
             
             $ticket->approvals()->where('status', 'pending')->update([
-                'status' => $approvalStatus,
+                'status'      => $approvalStatus,
                 'approved_by' => Auth::id(),
                 'approved_at' => now(),
-                'notes' => $request->resolution_notes,
+                'notes'       => $request->resolution_notes ?? 'Auto-approved via active status transition by ' . Auth::user()->name,
             ]);
 
-            // Jika disetujui (Approved)
-            if ($approvalStatus === 'approved') {
-                // CEK: Apakah teknisi sudah terlanjur beraksi/bekerja?
-                $hasTechnicianActed = ($ticket->status !== 'pending' && $ticket->status !== 'open') || !empty($ticket->assigned_to) || $ticket->assignedTechnicians()->exists();
+            TicketHistory::create([
+                'ticket_id' => $ticket->id,
+                'user_id'   => Auth::id(),
+                'field'     => 'status',
+                'old_value' => 'pending',
+                'new_value' => $request->status,
+                'note'      => 'Approval automatically cleared and status locked to ' . $request->status . ' by ' . Auth::user()->name,
+            ]);
 
-                if ($hasTechnicianActed) {
-                    // JANGAN UBAH STATUS! Biarkan status aktif yang dikerjakan teknisi tetap berjalan.
-                    $data['status'] = $ticket->status;
-                } else {
-                    // Jika belum beraksi sama sekali, jalankan auto-assign / set ke assigned seperti biasa
-                    $autoAssignee = \App\Models\AutoAssignRule::findAssignee(
-                        $ticket->category_id,
-                        $ticket->sub_category_id,
-                        $ticket->company_id,
-                        $ticket->vessel_name,
-                        Auth::user()->source
-                    );
-                    
-                    if ($autoAssignee) {
-                        $data['assigned_to'] = $autoAssignee;
-                        $data['assigned_at'] = now();
-                        $data['status']      = 'assigned';
-
-                        if (method_exists($ticket, 'assignedTechnicians')) {
-                            $ticket->assignedTechnicians()->sync([$autoAssignee]);
-                        }
-                    } else {
-                        $data['status'] = 'assigned';
-                    }
-
-                    TicketHistory::create([
-                        'ticket_id' => $ticket->id,
-                        'user_id'   => Auth::id(),
-                        'field'     => 'status',
-                        'old_value' => 'pending',
-                        'new_value' => 'assigned',
-                        'note'      => 'Ticket approved by Admin/Head IT and set to assigned',
-                    ]);
-                }
+            // Kirim WhatsApp Alert khusus ke Admin bahwa tiket On-Behalf telah di-action/diselesaikan teknisi
+            try {
+                $waAlert = "🔔 *[TICKET APPROVAL AUTO-CLEARED]*\n\n";
+                $waAlert .= "• Ticket ID: *{$ticket->ticket_number}*\n";
+                $waAlert .= "• Action By: *" . Auth::user()->name . "*\n";
+                $waAlert .= "• Status Locked: *" . strtoupper($request->status) . "*\n\n";
+                $waAlert .= "_Status approval sebelumnya telah otomatis disetujui karena teknisi langsung merespons/menyelesaikan tiket._";
+                
+                $this->notifyAdminViaWa($ticket, 'On-Behalf Status Updated & Approved', $waAlert);
+            } catch (\Exception $e) {
+                Log::error('WA Approval Clear Notification Failed: ' . $e->getMessage());
             }
         }
 
